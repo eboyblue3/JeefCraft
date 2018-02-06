@@ -102,7 +102,8 @@ int main(int argc, char **argv) {
    F64 secondTime = lastTime;
 
    S32 fpsCounter = 0;
-   char fpsBuffer[64];
+#define FPS_BUFFER_SIZE 128
+   char fpsBuffer[FPS_BUFFER_SIZE];
 
    // Set initial camera position
    vec cameraPos = vec3(25.0f, 10.0f, 10.0f);
@@ -127,8 +128,8 @@ int main(int argc, char **argv) {
       getCameraPosition(&pos);
 
       if ((current - secondTime) >= 1.0) { // 1 second.
-         memset(fpsBuffer, 0, 64);
-         snprintf(fpsBuffer, 64, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f", fpsCounter, delta, pos.x, pos.y, pos.z);
+         memset(fpsBuffer, 0, FPS_BUFFER_SIZE);
+         snprintf(fpsBuffer, FPS_BUFFER_SIZE, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f", fpsCounter, delta, pos.x, pos.y, pos.z);
          setWindowTitle(&window, fpsBuffer);
 
          // Reset
