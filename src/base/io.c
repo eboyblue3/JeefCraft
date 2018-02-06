@@ -15,7 +15,7 @@
 //----------------------------------------------------------------------------
 
 #include <stdio.h>
-#include <string>
+#include <string.h>
 #include <stdlib.h>
 #include "base/io.h"
 
