@@ -49,6 +49,7 @@ WindowData createWindow(const char *title, S32 width, S32 height, WindowCreation
 #endif
    if (data->api == OpenGL || data->api == OpenGLCore) {
       glfwMakeContextCurrent((GLFWwindow*)window.windowHandle);
+      glfwSwapInterval(0); // no vsync
    }
 
    gGLFW3PrimaryWindow = (GLFWwindow*)window.windowHandle;

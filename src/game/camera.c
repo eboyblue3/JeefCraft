@@ -50,8 +50,8 @@ void calculateFreecamViewMatrix(mat4 *viewMatrix, F32 delta) {
    F64 mouseY;
    inputGetMouseMovementForCurrentFrame(&mouseX, &mouseY);
 
-   gCameraInfo.horiziontalAngle += MOUSE_SPEED * mouseX;
-   gCameraInfo.verticalAngle += MOUSE_SPEED * mouseY;
+   gCameraInfo.horiziontalAngle += MOUSE_SPEED * (F32)mouseX;
+   gCameraInfo.verticalAngle += MOUSE_SPEED * (F32)mouseY;
 
    // Direction
    vec direction;

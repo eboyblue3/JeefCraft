@@ -38,6 +38,11 @@ add_library(glew STATIC "${THIRDPARTY_DIR}/glew/src/glew.c")
 target_include_directories(glew PUBLIC "${THIRDPARTY_DIR}/glew/include")
 target_compile_definitions(glew PUBLIC GLEW_STATIC)
 
+# Open Simplex Noise build
+add_library(open_simplex_noise STATIC "${THIRDPARTY_DIR}/opensimplexnoise/open-simplex-noise.c")
+target_include_directories(open_simplex_noise PUBLIC "${THIRDPARTY_DIR}/opensimplexnoise/")
+
+
 # Link GLFW3
 add_subdirectory("${THIRDPARTY_DIR}/glfw3" "${CMAKE_BINARY_DIR}/ThirdParty")
 
@@ -66,23 +71,40 @@ set(JEEFCRAFT_SRC
 	src/platform/glfw3/glfw3Window.c
 )
 add_executable(${EXECUTABLE_NAME} ${JEEFCRAFT_SRC})
-if (MSVC)
-	# Files must be set to compile with the C++ compiler on MSVC
-	set_source_files_properties(${JEEFCRAFT_SRC} PROPERTIES LANGUAGE CXX)
-	set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINKER_LANGUAGE CXX)
-endif()
 target_link_libraries(${EXECUTABLE_NAME}
 	glfw
 	glew
+	open_simplex_noise
 )
+
+# Platform specific library linking.
 if (MSVC)
-	target_link_libraries(${EXECUTABLE_NAME} kernel32.lib opengl32.lib)
+	target_link_libraries(${EXECUTABLE_NAME} 
+		kernel32.lib 
+		opengl32.lib
+	)
+
+	# Files must be set to compile with the C++ compiler on MSVC
+	set_source_files_properties(${JEEFCRAFT_SRC} PROPERTIES LANGUAGE CXX)
+	set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINKER_LANGUAGE CXX)	
+elseif(APPLE)
+	target_link_libraries(${EXECUTABLE_NAME} 
+		"-framework OpenGL"
+		"-framework Cocoa"
+	)
+elseif(UNIX)
+	target_link_libraries(${EXECUTABLE_NAME} 
+		GL
+	)
 endif()
+
 target_include_directories(${EXECUTABLE_NAME}
 	PUBLIC "${THIRDPARTY_DIR}/glfw3/include"
 	PUBLIC "${THIRDPARTY_DIR}/stb"
+	PUBLIC "${THIRDPARTY_DIR}/opensimplexnoise/"
 	PUBLIC src
 )
+
 source_group("base" REGULAR_EXPRESSION src/base/*)
 source_group("game" REGULAR_EXPRESSION src/game/*)
 source_group("graphics" REGULAR_EXPRESSION src/graphics/*)

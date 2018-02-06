@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stb_vec.h>
+#include <open-simplex-noise.h>
 #include "base/types.h"
 #include "platform/window.h"
 #include "platform/platform.h"
@@ -106,6 +107,12 @@ int main(int argc, char **argv) {
    vec cameraPos = vec3(4.0f, 3.0f, -3.0f);
    setCameraPosition(&cameraPos);
 
+   GLint projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
+   GLint modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
+
+   osn_context *osn;
+   open_simplex_noise((U64)0xDEADBEEF, &osn);
+
    while (gRunning) {
       // Calculate mouse movement for frame.
       inputCacheMouseMovementForCurrentFrame();
@@ -138,13 +145,30 @@ int main(int argc, char **argv) {
       calculateFreecamViewMatrix(&view, delta);
 
       mat4_mul(&projView, &proj, &view);
-      glUniformMatrix4fv(glGetUniformLocation(program, "projViewMatrix"), 1, GL_FALSE, &(projView.m[0].x));
+      glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
 
-      mat4 modelMatrix;
-      mat4_identity(&modelMatrix);
-      glUniformMatrix4fv(glGetUniformLocation(program, "modelMatrix"), 1, GL_FALSE, &(modelMatrix.m[0].x));
-      
-      glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, (void*)0);
+      for (S32 x = 0; x < 100; ++x) {
+         for (S32 z = 0; z < 100; ++z) {
+            mat4 modelMatrix;
+            mat4_identity(&modelMatrix);
+
+            // position offset
+            vec pos = vec3((F32)x, 0.0f, (F32)z);
+            // calcuate it with 2d noise. This is the y.
+
+            // So this is how noise works.
+            // 16.0 is stretch factor.
+            // noise returns between -1 to +1.
+            // 5 is the amplitude. So min/max will be no more than 10 units apart. But since we take
+            //   the absolute value, we are only the range between 0-1, so its only 5 units apart.
+            pos.y = fabsf(floorf((F32)open_simplex_noise2(osn, (F64)x / 16.0, (F64)z / 16.0) * 5.0f));
+
+            mat4_setPosition(&modelMatrix, &pos);
+
+            glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_SHORT, (void*)0);
+         }
+      }
 
       swapBuffers(&window);
       pollEvents(&window);

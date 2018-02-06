@@ -21,8 +21,20 @@
 #include <stb_vec.h>
 #include "base/types.h"
 
+inline void mat4_getPosition(vec *dest, mat4 *src) {
+   dest->x = src->m[3].x;
+   dest->x = src->m[3].y;
+   dest->x = src->m[3].z;
+}
+
+inline void mat4_setPosition(mat4 *matrix, vec *pos) {
+   matrix->m[3].x = pos->x;
+   matrix->m[3].y = pos->y;
+   matrix->m[3].z = pos->z;
+}
+
 inline void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar) {
-   F32 f = 1.0f / tan(fov / 2.0f);
+   F32 f = 1.0f / tanf(fov / 2.0f);
 
    dest->m[0].x = f / aspect;
    dest->m[0].y = 0.0f;
