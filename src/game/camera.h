@@ -20,6 +20,7 @@
 #include "base/types.h"
 #include <stb_vec.h>
 
+void initCamera();
 void getCameraPosition(vec *pos);
 void setCameraPosition(vec *pos);
 void calculateFreecamViewMatrix(mat4 *viewMatrix, F32 dt);

@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
 
    if (glewInit() != GLEW_OK)
       return -2;
+   initCamera();
 
    printf("OpenGL Driver Information:\n");
    printf("   Vendor:   %s\n", glGetString(GL_VENDOR));
@@ -104,7 +105,7 @@ int main(int argc, char **argv) {
    char fpsBuffer[64];
 
    // Set initial camera position
-   vec cameraPos = vec3(4.0f, 3.0f, -3.0f);
+   vec cameraPos = vec3(25.0f, 10.0f, 10.0f);
    setCameraPosition(&cameraPos);
 
    GLint projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
@@ -122,9 +123,12 @@ int main(int argc, char **argv) {
       F32 delta = F32(current - lastTime) * 1000.0f;
       lastTime = current;
 
+      vec pos;
+      getCameraPosition(&pos);
+
       if ((current - secondTime) >= 1.0) { // 1 second.
          memset(fpsBuffer, 0, 64);
-         snprintf(fpsBuffer, 64, "JeefCraft - FPS: %d mspf: %f", fpsCounter, delta);
+         snprintf(fpsBuffer, 64, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f", fpsCounter, delta, pos.x, pos.y, pos.z);
          setWindowTitle(&window, fpsBuffer);
 
          // Reset

@@ -21,13 +21,23 @@
 #define CAMERA_SPEED 4.0f
 #define MOUSE_SPEED 0.005f
 #define PI 3.14159f
+#define PI_2 1.570796f
+
+#define PITCH_MIN -PI_2
+#define PITCH_MAX (PI_2 - 0.2f)
 
 typedef struct CameraInfo {
    vec position;
    F32 horiziontalAngle;
    F32 verticalAngle;
 } CameraInfo;
-CameraInfo gCameraInfo = { vec3(0,0,0), 0.0f, 0.0f };
+CameraInfo gCameraInfo;
+
+void initCamera() {
+   gCameraInfo.position = vec3(0.0f, 0.0f, 0.0f);
+   gCameraInfo.horiziontalAngle = 0.0f;
+   gCameraInfo.verticalAngle = -0.45f;
+}
 
 void getCameraPosition(vec *pos) {
    pos->x = gCameraInfo.position.x;
@@ -52,6 +62,12 @@ void calculateFreecamViewMatrix(mat4 *viewMatrix, F32 delta) {
 
    gCameraInfo.horiziontalAngle += MOUSE_SPEED * (F32)mouseX;
    gCameraInfo.verticalAngle += MOUSE_SPEED * (F32)mouseY;
+
+   // Clamp pitch
+   if (gCameraInfo.verticalAngle < PITCH_MIN)
+      gCameraInfo.verticalAngle = PITCH_MIN;
+   else if (gCameraInfo.verticalAngle > PITCH_MAX)
+      gCameraInfo.verticalAngle = PITCH_MAX;
 
    // Direction
    vec direction;
