@@ -14,6 +14,7 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
+#include <string.h>
 #include "math/matrix.h"
 #include "game/camera.h"
 #include "platform/input.h"
@@ -30,6 +31,7 @@ typedef struct CameraInfo {
    vec position;
    F32 horiziontalAngle;
    F32 verticalAngle;
+   mat4 currentViewMatrix;
 } CameraInfo;
 CameraInfo gCameraInfo;
 
@@ -45,6 +47,10 @@ void getCameraPosition(vec *pos) {
    pos->z = gCameraInfo.position.z;
 }
 
+void getCurrentViewMatrix(mat4 *mat) {
+   memcpy(mat, &gCameraInfo.currentViewMatrix, sizeof(mat4));
+}
+
 void setCameraPosition(vec *pos) {
    gCameraInfo.position.x = pos->x;
    gCameraInfo.position.y = pos->y;
@@ -53,7 +59,7 @@ void setCameraPosition(vec *pos) {
 
 // Method based on the camera control inside of opengl-tutorial.com. As of [2/4/2018]
 // source code for that tutorial is released under the WTFPL version 2.0
-void calculateFreecamViewMatrix(mat4 *viewMatrix, F32 delta) {
+void calculateFreecamViewMatrix(F32 delta) {
    delta /= 1000.0f;
 
    F64 mouseX;
@@ -110,5 +116,5 @@ void calculateFreecamViewMatrix(mat4 *viewMatrix, F32 delta) {
    // Finally calcuate the view matrix.
    vec center;
    vec_add(&center, &gCameraInfo.position, &direction);
-   mat4_lookAt(viewMatrix, &gCameraInfo.position, &center, &up);
+   mat4_lookAt(&gCameraInfo.currentViewMatrix, &gCameraInfo.position, &center, &up);
 }

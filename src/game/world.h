@@ -14,16 +14,13 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _CAMERA_H_
-#define _CAMERA_H_
+#ifndef _GAME_WORLD_H_
+#define _GAME_WORLD_H_
 
 #include "base/types.h"
-#include <stb_vec.h>
 
-void initCamera();
-void getCameraPosition(vec *pos);
-void getCurrentViewMatrix(mat4 *mat);
-void setCameraPosition(vec *pos);
-void calculateFreecamViewMatrix(F32 dt);
+void initWorld();
+void freeWorld();
+void renderWorld(F32 dt);
 
-#endif
+#endif // _GAME_WORLD_H_
