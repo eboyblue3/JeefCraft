@@ -137,7 +137,7 @@ void buildFace(Chunk *chunk, S32 index, S32 side, vec *localPos) {
    renderChunk->indiceCount += 6;
 }
 
-void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
+void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
    // We modulate divide CHUNK_WIDTH as we keep the grid static
    // no matter where we move around on the map.
    // Say we go west, well, the first 'west' chunks are replaced by new chunks.
@@ -182,17 +182,11 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
       }
    }
 
-	//Swiss cheese chunk-- theoretical maximum # of faces / chunk
-   // Note: don't do this. a 16x16 grid will use over 6GB of memory.
-	/*for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
-		for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
-			for (S32 y = 0; y < MAX_CHUNK_HEIGHT; ++y) {
-				getCubeAt(cubeData, x, y, z)->material = (x + y + z) % 2 == 1 ? Material_Air : Material_Dirt;
-			}
-		}
-	}*/
+}
 
-   // TODO: start with commenting noise to check solid blocks first.
+void generateGeometry(S32 chunkX, S32 chunkZ) {
+   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+   Cube *cubeData = chunk->cubeData;
 
    // Generate geometry.
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
@@ -231,29 +225,7 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
    }
 }
 
-void initWorld() {
-   // Create shader
-   generateShaderProgram("Shaders/basic.vert", "Shaders/basic.frag", &program);
-   // bind attrib locations
-   glBindAttribLocation(program, 0, "position");
-   projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
-   modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
-
-   open_simplex_noise((U64)0xDEADBEEF, &osn);
-
-
-   // world grid
-   gChunkWorld = (Chunk*)calloc(worldSize * worldSize, sizeof(Chunk));
-
-   // Easilly put each chunk in a thread in here.
-   // nothing OpenGL, all calculation and world generation.
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
-         // World position calcuation before passing.
-         createChunk(x, z, x * CHUNK_WIDTH, z * CHUNK_WIDTH);
-      }
-   }
-
+void uploadGeometryToGL() {
    // *Single threaded*
    //
    // Upload to the GL
@@ -262,7 +234,7 @@ void initWorld() {
    //
    // TODO: use VAO if extension is supported??
    for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z= 0; z < worldSize; ++z) {
+      for (S32 z = 0; z < worldSize; ++z) {
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             RenderChunk *r = &getChunkAt(x, z)->renderChunks[i];
             if (r->vertexCount > 0) {
@@ -283,6 +255,44 @@ void initWorld() {
          }
       }
    }
+}
+
+void initWorld() {
+   // Create shader
+   generateShaderProgram("Shaders/basic.vert", "Shaders/basic.frag", &program);
+   // bind attrib locations
+   glBindAttribLocation(program, 0, "position");
+   projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
+   modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
+
+   open_simplex_noise((U64)0xDEADBEEF, &osn);
+
+
+   // world grid
+   gChunkWorld = (Chunk*)calloc(worldSize * worldSize, sizeof(Chunk));
+
+   // Easilly put each chunk in a thread in here.
+   // nothing OpenGL, all calculation and world generation.
+   for (S32 x = 0; x < worldSize; ++x) {
+      for (S32 z = 0; z < worldSize; ++z) {
+         // World position calcuation before passing.
+         generateWorld(x, z, x * CHUNK_WIDTH, z * CHUNK_WIDTH);
+      }
+   }
+
+   // TODO MULTITHREADED: sync here before generating the Geometry.
+
+   // Easilly put each chunk in a thread in here.
+   // nothing OpenGL, all calculation and world generation.
+   for (S32 x = 0; x < worldSize; ++x) {
+      for (S32 z = 0; z < worldSize; ++z) {
+         generateGeometry(x, z);
+      }
+   }
+
+   // TODO MULTITHREADED: sync here before GL upload.
+
+   uploadGeometryToGL();
 }
 
 void freeWorld() {
