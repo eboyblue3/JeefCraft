@@ -20,7 +20,7 @@
 #include "platform/input.h"
 
 #define CAMERA_SPEED 4.0f
-#define MOUSE_SPEED 0.005f
+#define MOUSE_SPEED -0.005f
 #define PI 3.14159f
 #define PI_2 1.570796f
 

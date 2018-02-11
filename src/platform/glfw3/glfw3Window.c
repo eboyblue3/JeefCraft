@@ -53,6 +53,8 @@ WindowData createWindow(const char *title, S32 width, S32 height, WindowCreation
       glfwSwapInterval(0); // no vsync
    }
 
+	glfwSetInputMode((GLFWwindow*)window.windowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
    gGLFW3PrimaryWindow = (GLFWwindow*)window.windowHandle;
    return window;
 }
