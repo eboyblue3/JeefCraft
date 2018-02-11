@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 typedef int8_t  S8;
 typedef int16_t S16;
