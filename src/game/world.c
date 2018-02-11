@@ -151,7 +151,6 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
 
    F64 stretchFactor = 16.0;
 
-/*
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
          // calculate height for each cube.
@@ -181,16 +180,17 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
             getCubeAt(cubeData, x, y, z)->material = Material_Bedrock;
          }
       }
-   }*/
+   }
 
 	//Swiss cheese chunk-- theoretical maximum # of faces / chunk
-	for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
+   // Note: don't do this. a 16x16 grid will use over 6GB of memory.
+	/*for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
 		for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
 			for (S32 y = 0; y < MAX_CHUNK_HEIGHT; ++y) {
 				getCubeAt(cubeData, x, y, z)->material = (x + y + z) % 2 == 1 ? Material_Air : Material_Dirt;
 			}
 		}
-	}
+	}*/
 
    // TODO: start with commenting noise to check solid blocks first.
 
@@ -275,6 +275,11 @@ void initWorld() {
                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r->ibo);
                glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * r->indiceCount, r->indices, GL_STATIC_DRAW);
             }
+
+            // Free right after uploading to the GL. We don't need gpu data
+            // in both system and gpu ram.
+            sb_free(r->vertexData);
+            sb_free(r->indices);
          }
       }
    }
@@ -291,9 +296,6 @@ void freeWorld() {
                glDeleteBuffers(1, &r->vbo);
                glDeleteBuffers(1, &r->ibo);
             }
-
-            sb_free(r->vertexData);
-            sb_free(r->indices);
          }
       }
    }
