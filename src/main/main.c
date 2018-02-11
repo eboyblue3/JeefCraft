@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
 
       // Get delta time in milliseconds.
       F64 current = getRealTime();
-      F32 delta = F32(current - lastTime) * 1000.0f;
+      F32 delta = (F32)(current - lastTime) * 1000.0f;
       lastTime = current;
 
       if ((current - secondTime) >= 1.0) { // 1 second.

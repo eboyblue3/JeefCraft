@@ -28,8 +28,8 @@
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
 #define RENDER_CHUNK_HEIGHT 16
-#define CHUNK_SIZE S32(MAX_CHUNK_HEIGHT * CHUNK_WIDTH * CHUNK_WIDTH)
-#define CHUNK_SPLITS S32(MAX_CHUNK_HEIGHT / RENDER_CHUNK_HEIGHT)
+#define CHUNK_SIZE (S32)(MAX_CHUNK_HEIGHT * CHUNK_WIDTH * CHUNK_WIDTH)
+#define CHUNK_SPLITS (S32)(MAX_CHUNK_HEIGHT / RENDER_CHUNK_HEIGHT)
 
 // Taken from std_voxel_render.h, from the public domain
 static F32 cubes[6][4][4] = {
@@ -50,7 +50,7 @@ typedef enum CubeSides {
    CubeSides_South,
 } CubeSides;
 
-static osn_context *osn;
+static struct osn_context *osn;
 
 typedef vec4 GPUVertex;
 
