@@ -15,6 +15,7 @@
 //----------------------------------------------------------------------------
 
 #include <math.h>
+#include <assert.h>
 #include <string.h>
 #include <GL/glew.h>
 #include <stb_vec.h>
@@ -95,7 +96,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 16;
+S32 worldSize = 2;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    return &gChunkWorld[(z * (worldSize)) + x];
@@ -122,6 +123,7 @@ void buildFace(Chunk *chunk, S32 index, S32 side, vec *localPos) {
       v.w = cubes[side][i][3];
       sb_push(renderChunk->vertexData, v);
    }
+	assert((U32)(renderChunk->vertexCount) + 4 < UINT16_MAX);
    renderChunk->vertexCount += 4;
 
    U16 in = renderChunk->currentIndex;
@@ -133,6 +135,8 @@ void buildFace(Chunk *chunk, S32 index, S32 side, vec *localPos) {
    sb_push(renderChunk->indices, in + 2);
    renderChunk->currentIndex += 4;
    renderChunk->indiceCount += 6;
+	assert((U32)(renderChunk->currentIndex) + 4 < UINT16_MAX);
+	assert((U32)(renderChunk->indiceCount) + 6 < UINT16_MAX);
 }
 
 void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
@@ -149,6 +153,7 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
 
    F64 stretchFactor = 16.0;
 
+/*
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
          // calculate height for each cube.
@@ -178,7 +183,16 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
             getCubeAt(cubeData, x, y, z)->material = Material_Bedrock;
          }
       }
-   }
+   }*/
+
+	//Swiss cheese chunk-- theoretical maximum # of faces / chunk
+	for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
+		for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
+			for (S32 y = 0; y < MAX_CHUNK_HEIGHT; ++y) {
+				getCubeAt(cubeData, x, y, z)->material = (x + y + z) % 2 == 1 ? Material_Air : Material_Dirt;
+			}
+		}
+	}
 
    // TODO: start with commenting noise to check solid blocks first.
 
@@ -201,17 +215,17 @@ void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
                // TODO: there will be more transparent blocks than just air.
                // Maybe make a macro or function to check if isTransparent ?
 
-               //if (y == 0 || getCubeAt(cubeData, x, y - 1, z)->material == Material_Air)
+               if (y == 0 || getCubeAt(cubeData, x, y - 1, z)->material == Material_Air)
                   buildFace(chunk, i, CubeSides_Down, &localPos);
-               //if (y >= (MAX_CHUNK_HEIGHT - 1) || getCubeAt(cubeData, x, y + 1, z)->material == Material_Air)
+               if (y >= (MAX_CHUNK_HEIGHT - 1) || getCubeAt(cubeData, x, y + 1, z)->material == Material_Air)
                   buildFace(chunk, i, CubeSides_Up, &localPos);
-               //if (x == 0 || getCubeAt(cubeData, x - 1, y, z)->material == Material_Air)
+               if (x == 0 || getCubeAt(cubeData, x - 1, y, z)->material == Material_Air)
                   buildFace(chunk, i, CubeSides_West, &localPos);
-               //if (x >= (CHUNK_WIDTH - 1) || getCubeAt(cubeData, x + 1, y, z)->material == Material_Air)
+               if (x >= (CHUNK_WIDTH - 1) || getCubeAt(cubeData, x + 1, y, z)->material == Material_Air)
                   buildFace(chunk, i, CubeSides_East, &localPos);
-               //if (z == 0 || getCubeAt(cubeData, x, y, z - 1)->material == Material_Air)
+               if (z == 0 || getCubeAt(cubeData, x, y, z - 1)->material == Material_Air)
                   buildFace(chunk, i, CubeSides_South, &localPos);
-               //if (z >= (CHUNK_WIDTH - 1) || getCubeAt(cubeData, x, y, z + 1)->material == Material_Air)
+               if (z >= (CHUNK_WIDTH - 1) || getCubeAt(cubeData, x, y, z + 1)->material == Material_Air)
                   buildFace(chunk, i, CubeSides_North, &localPos);
             }
          }
@@ -314,7 +328,7 @@ void renderWorld(F32 dt) {
             if (c->renderChunks[i].vertexCount > 0) {
 
                // Set position.
-               vec pos = vec3(x * CHUNK_WIDTH, RENDER_CHUNK_HEIGHT * i, z * CHUNK_WIDTH);
+               vec pos = vec3(x * CHUNK_WIDTH, 0, z * CHUNK_WIDTH);
                mat4 modelMatrix;
                mat4_identity(&modelMatrix);
                mat4_setPosition(&modelMatrix, &pos);
