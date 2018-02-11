@@ -97,7 +97,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 32;
+S32 worldSize = 16;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    return &gChunkWorld[(z * (worldSize)) + x];
@@ -371,7 +371,7 @@ void renderWorld(F32 dt) {
 
    // proj/view matrix
    mat4 proj, view, projView;
-   mat4_perspective(&proj, 1.5708f, 1440.0f / 900.0f, 0.01f, 200.0f);
+   mat4_perspective(&proj, 1.5708f, 1440.0f / 900.0f, 0.01f, (F32)(CHUNK_WIDTH * worldSize));
    getCurrentViewMatrix(&view);
    mat4_mul(&projView, &proj, &view);
    glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
