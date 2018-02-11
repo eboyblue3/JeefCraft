@@ -54,6 +54,7 @@ typedef enum CubeSides {
 static struct osn_context *osn;
 
 typedef vec4 GPUVertex;
+typedef U32 GPUIndex;
 
 typedef struct Cube {
    U16 material : 10; // 1024 material types
@@ -77,9 +78,9 @@ typedef enum Materials {
 
 typedef struct RenderChunk {
    GPUVertex *vertexData; /// stretchy buffer
-   U16 *indices;          /// stretchy buffer
-   U16 currentIndex;      /// Current index offset
-   U16 indiceCount;       /// Indice Size
+   GPUIndex *indices;          /// stretchy buffer
+   GPUIndex currentIndex;      /// Current index offset
+   GPUIndex indiceCount;       /// Indice Size
    S32 vertexCount;       /// VertexData Count 
 
    GLuint vbo;            /// OpenGL Vertex Buffer Object
@@ -96,7 +97,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 2;
+S32 worldSize = 16;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    return &gChunkWorld[(z * (worldSize)) + x];
@@ -123,10 +124,9 @@ void buildFace(Chunk *chunk, S32 index, S32 side, vec *localPos) {
       v.w = cubes[side][i][3];
       sb_push(renderChunk->vertexData, v);
    }
-	assert((U32)(renderChunk->vertexCount) + 4 < UINT16_MAX);
    renderChunk->vertexCount += 4;
 
-   U16 in = renderChunk->currentIndex;
+   GPUIndex in = renderChunk->currentIndex;
    sb_push(renderChunk->indices, in);
    sb_push(renderChunk->indices, in + 2);
    sb_push(renderChunk->indices, in + 1);
@@ -135,8 +135,6 @@ void buildFace(Chunk *chunk, S32 index, S32 side, vec *localPos) {
    sb_push(renderChunk->indices, in + 2);
    renderChunk->currentIndex += 4;
    renderChunk->indiceCount += 6;
-	assert((U32)(renderChunk->currentIndex) + 4 < UINT16_MAX);
-	assert((U32)(renderChunk->indiceCount) + 6 < UINT16_MAX);
 }
 
 void createChunk(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
@@ -275,7 +273,7 @@ void initWorld() {
                glBufferData(GL_ARRAY_BUFFER, sizeof(GPUVertex) * r->vertexCount, r->vertexData, GL_STATIC_DRAW);
 
                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r->ibo);
-               glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(U16) * r->indiceCount, r->indices, GL_STATIC_DRAW);
+               glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * r->indiceCount, r->indices, GL_STATIC_DRAW);
             }
          }
       }
@@ -338,7 +336,7 @@ void renderWorld(F32 dt) {
                glEnableVertexAttribArray(0);
                glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, NULL);
                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
-               glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_SHORT, (void*)0);
+               glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
             }
          }
       }
