@@ -97,7 +97,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 16;
+S32 worldSize = 32;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    return &gChunkWorld[(z * (worldSize)) + x];
@@ -184,6 +184,10 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
 
 }
 
+inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
+   return getCubeAt(cubeData, x, y, z)->material == Material_Air;
+}
+
 void generateGeometry(S32 chunkX, S32 chunkZ) {
    Chunk *chunk = getChunkAt(chunkX, chunkZ);
    Cube *cubeData = chunk->cubeData;
@@ -201,23 +205,66 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                if (getCubeAt(cubeData, x, y, z)->material == Material_Air)
                   continue;
 
+               // Cross chunk checking. Only need to check x and z axes.
+               // If the next *chunk* over is is transparent then ya we have
+               // to render regardless.
+               bool isOpaqueNegativeX = false;
+               bool isOpaquePositiveX = false;
+               bool isOpaqueNegativeZ = false;
+               bool isOpaquePositiveZ = false;
+
+               if (x == 0 && chunkX > 0) {
+                  Cube *behindData = getChunkAt(chunkX - 1, chunkZ)->cubeData;
+                  if (!isTransparent(behindData, CHUNK_WIDTH - 1, y, z)) {
+                     // The cube behind us on the previous chunk is in fact
+                     // transparent. We need to render this face.
+                     isOpaqueNegativeX = true;
+                  }
+               }
+               if (x == (CHUNK_WIDTH - 1) && (chunkX + 1) < worldSize) {
+                  Cube *behindData = getChunkAt(chunkX + 1, chunkZ)->cubeData;
+                  if (!isTransparent(behindData, 0, y, z)) {
+                     // The cube behind us on the previous chunk is in fact
+                     // transparent. We need to render this face.
+                     isOpaquePositiveX = true;
+                  }
+               }
+               if (z == 0 && chunkZ > 0) {
+                  Cube *behindData = getChunkAt(chunkX, chunkZ - 1)->cubeData;
+                  if (!isTransparent(behindData, x, y, CHUNK_WIDTH - 1)) {
+                     // The cube behind us on the previous chunk is in fact
+                     // transparent. We need to render this face.
+                     isOpaqueNegativeZ = true;
+                  }
+               }
+               if (z == (CHUNK_WIDTH - 1) && (chunkZ + 1) < worldSize) {
+                  Cube *behindData = getChunkAt(chunkX, chunkZ + 1)->cubeData;
+                  if (!isTransparent(behindData, x, y, 0)) {
+                     // The cube behind us on the previous chunk is in fact
+                     // transparent. We need to render this face.
+                     isOpaquePositiveZ = true;
+                  }
+               }
+
                // check all 6 directions to see if the cube is exposed.
                // If the cube is exposed in that direction, render that face.
-               //
-               // TODO: there will be more transparent blocks than just air.
-               // Maybe make a macro or function to check if isTransparent ?
 
-               if (y == 0 || getCubeAt(cubeData, x, y - 1, z)->material == Material_Air)
+               if (y == 0 || isTransparent(cubeData, x, y - 1, z))
                   buildFace(chunk, i, CubeSides_Down, &localPos);
-               if (y >= (MAX_CHUNK_HEIGHT - 1) || getCubeAt(cubeData, x, y + 1, z)->material == Material_Air)
+
+               if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
                   buildFace(chunk, i, CubeSides_Up, &localPos);
-               if (x == 0 || getCubeAt(cubeData, x - 1, y, z)->material == Material_Air)
+
+               if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
                   buildFace(chunk, i, CubeSides_West, &localPos);
-               if (x >= (CHUNK_WIDTH - 1) || getCubeAt(cubeData, x + 1, y, z)->material == Material_Air)
+
+               if ((!isOpaquePositiveX && x >= (CHUNK_WIDTH - 1)) || (x < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x + 1, y, z)))
                   buildFace(chunk, i, CubeSides_East, &localPos);
-               if (z == 0 || getCubeAt(cubeData, x, y, z - 1)->material == Material_Air)
+
+               if ((!isOpaqueNegativeZ && z == 0) || (z > 0 && isTransparent(cubeData, x, y, z - 1)))
                   buildFace(chunk, i, CubeSides_South, &localPos);
-               if (z >= (CHUNK_WIDTH - 1) || getCubeAt(cubeData, x, y, z + 1)->material == Material_Air)
+
+               if ((!isOpaquePositiveZ && z >= (CHUNK_WIDTH - 1)) || (z < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x, y, z + 1)))
                   buildFace(chunk, i, CubeSides_North, &localPos);
             }
          }
@@ -266,7 +313,6 @@ void initWorld() {
    modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
 
    open_simplex_noise((U64)0xDEADBEEF, &osn);
-
 
    // world grid
    gChunkWorld = (Chunk*)calloc(worldSize * worldSize, sizeof(Chunk));
@@ -330,7 +376,6 @@ void renderWorld(F32 dt) {
    mat4_mul(&projView, &proj, &view);
    glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
 
-
    for (S32 x = 0; x < worldSize; ++x) {
       for (S32 z = 0; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
@@ -343,7 +388,6 @@ void renderWorld(F32 dt) {
                mat4_identity(&modelMatrix);
                mat4_setPosition(&modelMatrix, &pos);
                glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
-
                glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
                glEnableVertexAttribArray(0);
                glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, NULL);

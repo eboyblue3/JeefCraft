@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
          getCameraPosition(&pos);
 
          memset(fpsBuffer, 0, FPS_BUFFER_SIZE);
-         snprintf(fpsBuffer, FPS_BUFFER_SIZE, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f", fpsCounter, delta, pos.x, pos.y, pos.z);
+         snprintf(fpsBuffer, FPS_BUFFER_SIZE, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f", fpsCounter, (1000.0f / (F32)fpsCounter), pos.x, pos.y, pos.z);
          setWindowTitle(&window, fpsBuffer);
 
          // Reset
