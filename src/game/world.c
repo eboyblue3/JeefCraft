@@ -201,8 +201,8 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                S32 y = (RENDER_CHUNK_HEIGHT * i) + j;
                vec localPos = vec3(x, y, z);
 
-               // skip air
-               if (getCubeAt(cubeData, x, y, z)->material == Material_Air)
+               // skip if current block is transparent.
+               if (isTransparent(cubeData, x, y, z))
                   continue;
 
                // Cross chunk checking. Only need to check x and z axes.
