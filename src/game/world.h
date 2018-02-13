@@ -14,26 +14,13 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _BASE_TYPES_H_
-#define _BASE_TYPES_H_
+#ifndef _GAME_WORLD_H_
+#define _GAME_WORLD_H_
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdio.h>
+#include "base/types.h"
 
-typedef int8_t  S8;
-typedef int16_t S16;
-typedef int32_t S32;
-typedef int64_t S64;
+void initWorld();
+void freeWorld();
+void renderWorld(F32 dt);
 
-typedef uint8_t  U8;
-typedef uint16_t U16;
-typedef uint32_t U32;
-typedef uint64_t U64;
-
-typedef float  F32;
-typedef double F64;
-
-typedef size_t WordSize;
-
-#endif
+#endif // _GAME_WORLD_H_

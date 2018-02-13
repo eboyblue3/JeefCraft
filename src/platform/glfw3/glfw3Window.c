@@ -19,6 +19,7 @@
 #endif
 
 #include <assert.h>
+#include <string.h>
 #include <GLFW/glfw3.h>
 #include <GLFW/glfw3native.h>
 
@@ -51,6 +52,8 @@ WindowData createWindow(const char *title, S32 width, S32 height, WindowCreation
       glfwMakeContextCurrent((GLFWwindow*)window.windowHandle);
       glfwSwapInterval(0); // no vsync
    }
+
+	glfwSetInputMode((GLFWwindow*)window.windowHandle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
    gGLFW3PrimaryWindow = (GLFWwindow*)window.windowHandle;
    return window;

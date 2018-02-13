@@ -53,13 +53,18 @@ set(JEEFCRAFT_SRC
 
 	src/game/camera.c
 	src/game/camera.h
+	src/game/world.c
+	src/game/world.h
 
 	src/graphics/shader.c
 	src/graphics/shader.h
+	src/graphics/texture2d.c
+	src/graphics/texture2d.h
 
 	src/main/main.c
 
 	src/math/math_impl.c
+	src/math/matrix.c
 	src/math/matrix.h
 
 	src/platform/input.h

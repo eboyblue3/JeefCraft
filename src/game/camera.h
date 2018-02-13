@@ -22,7 +22,8 @@
 
 void initCamera();
 void getCameraPosition(vec *pos);
+void getCurrentViewMatrix(mat4 *mat);
 void setCameraPosition(vec *pos);
-void calculateFreecamViewMatrix(mat4 *viewMatrix, F32 dt);
+void calculateFreecamViewMatrix(F32 dt);
 
 #endif

@@ -145,6 +145,7 @@ typedef struct MouseMovementCache {
    F64 y;
 } MouseMovementCache;
 MouseMovementCache gMouseMovementCache = { 0.0, 0.0 };
+MouseMovementCache gLastMousePosition = { 0.0, 0.0 };
 
 KeyState inputGetKeyStatus(Key key) {
    // We must have a window in order to do key presses.
@@ -160,23 +161,16 @@ void inputCacheMouseMovementForCurrentFrame() {
    // We must have a window in order to do key presses.
    assert(gGLFW3PrimaryWindow);
 
-   // Get width/height of monitor so we can use it to get the center
-   // of the screen.
-   S32 width;
-   S32 height;
-   glfwGetWindowSize(gGLFW3PrimaryWindow, &width, &height);
-
-   F64 centerX = (F64)width / 2.0;
-   F64 centerY = (F64)height / 2.0;
-
    F64 x;
    F64 y;
    glfwGetCursorPos(gGLFW3PrimaryWindow, &x, &y);
-   glfwSetCursorPos(gGLFW3PrimaryWindow, centerX, centerY);
+
+	gMouseMovementCache.x = x - gLastMousePosition.x;
+	gMouseMovementCache.y = y - gLastMousePosition.y;
 
    // Calculate offset from center.
-   gMouseMovementCache.x = centerX - x;
-   gMouseMovementCache.y = centerY - y;
+   gLastMousePosition.x = x;
+   gLastMousePosition.y = y;
 }
 
 /// The idea is that the mouse movement is cached for a given frame.
