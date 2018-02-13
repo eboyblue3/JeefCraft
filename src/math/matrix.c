@@ -18,8 +18,8 @@
 
 void mat4_getPosition(vec *dest, mat4 *src) {
    dest->x = src->m[3].x;
-   dest->x = src->m[3].y;
-   dest->x = src->m[3].z;
+   dest->y = src->m[3].y;
+   dest->z = src->m[3].z;
 }
 
 void mat4_setPosition(mat4 *matrix, vec *pos) {

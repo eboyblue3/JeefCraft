@@ -25,6 +25,7 @@
 #include "math/matrix.h"
 #include "game/camera.h"
 #include "graphics/shader.h"
+#include "graphics/texture2d.h"
 
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
@@ -42,6 +43,15 @@ static F32 cubes[6][4][4] = {
    { { 0,0,0,5 },{ 1,0,0,5 },{ 1,1,0,5 },{ 0,1,0,5 } }, // south
 };
 
+static F32 cubeUVs[6][4][2] = {
+   { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // East
+   { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }, // up
+   { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }, // west
+   { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // down
+   { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // north
+   { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } }  // south
+};
+
 typedef enum CubeSides {
    CubeSides_East,
    CubeSides_Up,
@@ -53,7 +63,11 @@ typedef enum CubeSides {
 
 static struct osn_context *osn;
 
-typedef vec4 GPUVertex;
+typedef struct GPUVertex {
+   vec4 position;
+   vec2 uvs;
+} GPUVertex;
+
 typedef U32 GPUIndex;
 
 typedef struct Cube {
@@ -67,7 +81,8 @@ typedef enum Materials {
    Material_Air,
    Material_Bedrock,
    Material_Dirt,
-   Material_Grass
+   Material_Grass,     // Also note that bottoms of grass have dirt blocks.
+   Material_Grass_Side // Sides of grass have a special texture.
 } Material;
 
 // TODO: store a list of pointers of RenderChunk array (RenderChunk**)
@@ -105,23 +120,30 @@ Chunk* getChunkAt(S32 x, S32 z) {
 
 GLuint projMatrixLoc;
 GLuint modelMatrixLoc;
+GLuint textureLoc;
 U32 program;
+Texture2D textureAtlas;
 
 Cube* getCubeAt(Cube *cubeData, S32 x, S32 y, S32 z) {
    return &cubeData[x * (MAX_CHUNK_HEIGHT) * (CHUNK_WIDTH) + z * (MAX_CHUNK_HEIGHT) + y];
 }
 
-void buildFace(Chunk *chunk, S32 index, S32 side, vec *localPos) {
+#define TEXTURE_ATLAS_COUNT_I 32
+#define TEXTURE_ATLAS_COUNT_F 32.0f
+
+void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, vec *localPos) {
    // Vertex data first, then index data.
 
    RenderChunk *renderChunk = &chunk->renderChunks[index];
 
    for (S32 i = 0; i < 4; ++i) {
-      vec4 v;
-      v.x = cubes[side][i][0] + localPos->x;
-      v.y = cubes[side][i][1] + localPos->y;
-      v.z = cubes[side][i][2] + localPos->z;
-      v.w = cubes[side][i][3];
+      GPUVertex v;
+      v.position.x = cubes[side][i][0] + localPos->x;
+      v.position.y = cubes[side][i][1] + localPos->y;
+      v.position.z = cubes[side][i][2] + localPos->z;
+      v.position.w = cubes[side][i][3];
+      v.uvs.x = (cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvs.y = (cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
       sb_push(renderChunk->vertexData, v);
    }
    renderChunk->vertexCount += 4;
@@ -249,23 +271,25 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                // check all 6 directions to see if the cube is exposed.
                // If the cube is exposed in that direction, render that face.
 
+               S32 material = getCubeAt(cubeData, x, y, z)->material;
+
                if (y == 0 || isTransparent(cubeData, x, y - 1, z))
-                  buildFace(chunk, i, CubeSides_Down, &localPos);
+                  buildFace(chunk, i, CubeSides_Down, material, &localPos);
 
                if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
-                  buildFace(chunk, i, CubeSides_Up, &localPos);
+                  buildFace(chunk, i, CubeSides_Up, material, &localPos);
 
                if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
-                  buildFace(chunk, i, CubeSides_West, &localPos);
+                  buildFace(chunk, i, CubeSides_West, material, &localPos);
 
                if ((!isOpaquePositiveX && x >= (CHUNK_WIDTH - 1)) || (x < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x + 1, y, z)))
-                  buildFace(chunk, i, CubeSides_East, &localPos);
+                  buildFace(chunk, i, CubeSides_East, material, &localPos);
 
                if ((!isOpaqueNegativeZ && z == 0) || (z > 0 && isTransparent(cubeData, x, y, z - 1)))
-                  buildFace(chunk, i, CubeSides_South, &localPos);
+                  buildFace(chunk, i, CubeSides_South, material, &localPos);
 
                if ((!isOpaquePositiveZ && z >= (CHUNK_WIDTH - 1)) || (z < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x, y, z + 1)))
-                  buildFace(chunk, i, CubeSides_North, &localPos);
+                  buildFace(chunk, i, CubeSides_North, material, &localPos);
             }
          }
       }
@@ -305,12 +329,20 @@ void uploadGeometryToGL() {
 }
 
 void initWorld() {
+   // Only 2 mip levels.
+   bool ret = createTexture2D("Assets/block_atlas.png", 4, 2, &textureAtlas);
+   if (!ret) {
+      exit(-3);
+   }
+
    // Create shader
    generateShaderProgram("Shaders/basic.vert", "Shaders/basic.frag", &program);
    // bind attrib locations
    glBindAttribLocation(program, 0, "position");
+   glBindAttribLocation(program, 1, "uvs");
    projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
    modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
+   textureLoc = glGetUniformLocation(program, "textureAtlas");
 
    open_simplex_noise((U64)0xDEADBEEF, &osn);
 
@@ -376,6 +408,11 @@ void renderWorld(F32 dt) {
    mat4_mul(&projView, &proj, &view);
    glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
 
+   // Bind our texture atlas to texture unit 0
+   glActiveTexture(GL_TEXTURE0);
+   glBindTexture(GL_TEXTURE_2D, textureAtlas.glId);
+   glUniform1i(textureLoc, 0);
+
    for (S32 x = 0; x < worldSize; ++x) {
       for (S32 z = 0; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
@@ -390,7 +427,9 @@ void renderWorld(F32 dt) {
                glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
                glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
                glEnableVertexAttribArray(0);
-               glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, NULL);
+               glEnableVertexAttribArray(1);
+               glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, position));
+               glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
                glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
             }

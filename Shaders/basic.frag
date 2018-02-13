@@ -2,7 +2,10 @@
 
 varying vec3 vNormal;
 varying vec3 pos;
+varying vec2 vUvs;
+
+uniform sampler2D textureAtlas;
 
 void main() {
-	gl_FragColor = vec4((floor(pos) / vec3(16, 256, 16)), 1);
+	gl_FragColor = texture2D(textureAtlas, vUvs);
 }

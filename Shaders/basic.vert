@@ -1,8 +1,11 @@
 #version 120
 
 attribute vec4 position;
+attribute vec2 uvs;
+
 varying vec3 vNormal;
 varying vec3 pos;
+varying vec2 vUvs;
 
 uniform mat4 projViewMatrix;
 uniform mat4 modelMatrix;
@@ -20,4 +23,5 @@ void main() {
 	gl_Position = mvp * vec4(position.xyz, 1.0);
 	vNormal = cNormals[int(position.w)];
 	pos = vec3(position);
+	vUvs = uvs;
 }

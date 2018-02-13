@@ -58,6 +58,8 @@ set(JEEFCRAFT_SRC
 
 	src/graphics/shader.c
 	src/graphics/shader.h
+	src/graphics/texture2d.c
+	src/graphics/texture2d.h
 
 	src/main/main.c
 
