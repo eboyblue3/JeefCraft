@@ -115,7 +115,13 @@ Chunk *gChunkWorld = NULL;
 S32 worldSize = 16;
 
 Chunk* getChunkAt(S32 x, S32 z) {
-   return &gChunkWorld[(z * (worldSize)) + x];
+   // Since x and z can go from -worldSize to worldSize,
+   // we need to normalize them so that they are always positive.
+   x += worldSize;
+   z += worldSize;
+
+   S32 index = (z * (worldSize * 2)) + x;
+   return &gChunkWorld[index];
 }
 
 GLuint projMatrixLoc;
@@ -304,8 +310,8 @@ void uploadGeometryToGL() {
    // Note if a chunk has no geometry we don't create a vbo
    //
    // TODO: use VAO if extension is supported??
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             RenderChunk *r = &getChunkAt(x, z)->renderChunks[i];
             if (r->vertexCount > 0) {
@@ -347,12 +353,12 @@ void initWorld() {
    open_simplex_noise((U64)0xDEADBEEF, &osn);
 
    // world grid
-   gChunkWorld = (Chunk*)calloc(worldSize * worldSize, sizeof(Chunk));
+   gChunkWorld = (Chunk*)calloc((worldSize * 2) * (worldSize * 2), sizeof(Chunk));
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          // World position calcuation before passing.
          generateWorld(x, z, x * CHUNK_WIDTH, z * CHUNK_WIDTH);
       }
@@ -362,8 +368,8 @@ void initWorld() {
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          generateGeometry(x, z);
       }
    }
@@ -374,8 +380,8 @@ void initWorld() {
 }
 
 void freeWorld() {
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
          free(c->cubeData);
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
@@ -413,8 +419,8 @@ void renderWorld(F32 dt) {
    glBindTexture(GL_TEXTURE_2D, textureAtlas.glId);
    glUniform1i(textureLoc, 0);
 
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             if (c->renderChunks[i].vertexCount > 0) {
