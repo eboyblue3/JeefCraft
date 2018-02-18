@@ -181,7 +181,7 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
    chunk->cubeData = (Cube*)calloc(CHUNK_SIZE, sizeof(Cube));
    Cube *cubeData = chunk->cubeData;
 
-   F64 stretchFactor = 16.0;
+   F64 stretchFactor = 20.0;
 
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
@@ -190,15 +190,15 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
          // also make sure to use the world coordinates
 
          // Smoothen the noise based on 5 blocks surrounding it.
-         F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 10.0);
+         F64 noise = (open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor)) * 10.0;
          for (S32 i = -5; i < 5; ++i) {
             for (S32 j = -5; j < 5; ++j) {
-               noise += fabs(open_simplex_noise2(osn, (F64)(x + i + worldX) / (stretchFactor + i), (F64)(z + j + worldZ) / (stretchFactor + j)) * (10.0 + j)) / 2.0f;
+               noise += (open_simplex_noise2(osn, (F64)(x + i + worldX) / (stretchFactor + i), (F64)(z + j + worldZ) / (stretchFactor + j)) * (10.0 + j)) / 2.0f;
             }
             noise /= 10.f;
          }
          //F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 10.0);
-         S32 height = (S32)(noise) + 60.0f; // 60 as base height.
+         S32 height = (S32)(noise) + 70.0f; // 70 as base height.
 
          // Make block at height level grass.
          getCubeAt(cubeData, x, height, z)->material = Material_Grass;
