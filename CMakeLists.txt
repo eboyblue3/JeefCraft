@@ -63,6 +63,8 @@ set(JEEFCRAFT_SRC
 
 	src/main/main.c
 
+	src/math/frustum.c
+	src/math/frustum.h
 	src/math/math_impl.c
 	src/math/matrix.c
 	src/math/matrix.h

@@ -26,6 +26,7 @@
 #include "game/camera.h"
 #include "graphics/shader.h"
 #include "graphics/texture2d.h"
+#include "math/frustum.h"
 
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
@@ -112,7 +113,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 16;
+S32 worldSize = 8;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    // Since x and z can go from -worldSize to worldSize,
@@ -210,6 +211,11 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
       }
    }
 
+}
+
+F32 getViewDistance() {
+   // Give 1 chunk 'padding' looking forward.
+   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
 }
 
 inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
@@ -334,6 +340,10 @@ void uploadGeometryToGL() {
    }
 }
 
+int gVisibleChunks = 0;
+int gTotalVisibleChunks = 0;
+int gTotalChunks = 0;
+
 void initWorld() {
    // Only 2 mip levels.
    bool ret = createTexture2D("Assets/block_atlas.png", 4, 2, &textureAtlas);
@@ -354,6 +364,7 @@ void initWorld() {
 
    // world grid
    gChunkWorld = (Chunk*)calloc((worldSize * 2) * (worldSize * 2), sizeof(Chunk));
+   gTotalChunks = worldSize * 2 * worldSize * 2 * CHUNK_SPLITS;
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
@@ -409,7 +420,7 @@ void renderWorld(F32 dt) {
 
    // proj/view matrix
    mat4 proj, view, projView;
-   mat4_perspective(&proj, 1.5708f, 1440.0f / 900.0f, 0.01f, (F32)(CHUNK_WIDTH * worldSize));
+   getCurrentProjMatrix(&proj);
    getCurrentViewMatrix(&view);
    mat4_mul(&projView, &proj, &view);
    glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
@@ -419,25 +430,41 @@ void renderWorld(F32 dt) {
    glBindTexture(GL_TEXTURE_2D, textureAtlas.glId);
    glUniform1i(textureLoc, 0);
 
+   gVisibleChunks = 0;
+   gTotalVisibleChunks = 0;
+
+   Frustum frustum;
+   getCameraFrustum(&frustum);
+
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             if (c->renderChunks[i].vertexCount > 0) {
+               gTotalVisibleChunks++;
 
                // Set position.
                vec pos = vec3(x * CHUNK_WIDTH, 0, z * CHUNK_WIDTH);
-               mat4 modelMatrix;
-               mat4_identity(&modelMatrix);
-               mat4_setPosition(&modelMatrix, &pos);
-               glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
-               glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
-               glEnableVertexAttribArray(0);
-               glEnableVertexAttribArray(1);
-               glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, position));
-               glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
-               glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
-               glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
+               vec center;
+               vec halfExtents = vec3(CHUNK_WIDTH / 2.0f, RENDER_CHUNK_HEIGHT / 2.0f, CHUNK_WIDTH / 2.0f);
+               vec_add(&center, &pos, &halfExtents);
+
+               // TODO: test frustrum culling
+               if (FrustumCullSquareBox(&frustum, &center, CHUNK_WIDTH / 2.0f)) {
+                  mat4 modelMatrix;
+                  mat4_identity(&modelMatrix);
+                  mat4_setPosition(&modelMatrix, &pos);
+                  glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
+                  glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
+                  glEnableVertexAttribArray(0);
+                  glEnableVertexAttribArray(1);
+                  glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, position));
+                  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
+                  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
+                  glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
+
+                  gVisibleChunks++;
+               }
             }
          }
       }

@@ -32,6 +32,8 @@ typedef struct CameraInfo {
    F32 horiziontalAngle;
    F32 verticalAngle;
    mat4 currentViewMatrix;
+   mat4 currentProjMatrix;
+   Frustum frustum;
 } CameraInfo;
 CameraInfo gCameraInfo;
 
@@ -47,14 +49,26 @@ void getCameraPosition(vec *pos) {
    pos->z = gCameraInfo.position.z;
 }
 
+void getCurrentProjMatrix(mat4 *mat) {
+   memcpy(mat, &gCameraInfo.currentProjMatrix, sizeof(mat4));
+}
+
 void getCurrentViewMatrix(mat4 *mat) {
    memcpy(mat, &gCameraInfo.currentViewMatrix, sizeof(mat4));
+}
+
+void setCameraProjMatrix(mat4 *mat) {
+   memcpy(&gCameraInfo.currentProjMatrix, mat, sizeof(mat4));
 }
 
 void setCameraPosition(vec *pos) {
    gCameraInfo.position.x = pos->x;
    gCameraInfo.position.y = pos->y;
    gCameraInfo.position.z = pos->z;
+}
+
+void getCameraFrustum(Frustum *frustum) {
+   memcpy(frustum, &gCameraInfo.frustum, sizeof(mat4));
 }
 
 // Method based on the camera control inside of opengl-tutorial.com. As of [2/4/2018]
@@ -117,4 +131,9 @@ void calculateFreecamViewMatrix(F32 delta) {
    vec center;
    vec_add(&center, &gCameraInfo.position, &direction);
    mat4_lookAt(&gCameraInfo.currentViewMatrix, &gCameraInfo.position, &center, &up);
+
+   // Update frustum
+   mat4 mvp;
+   mat4_mul(&mvp, &gCameraInfo.currentProjMatrix, &gCameraInfo.currentViewMatrix);
+   computeFrustum(&mvp, &gCameraInfo.frustum);
 }
