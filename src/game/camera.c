@@ -68,7 +68,7 @@ void setCameraPosition(vec *pos) {
 }
 
 void getCameraFrustum(Frustum *frustum) {
-   memcpy(frustum, &gCameraInfo.frustum, sizeof(mat4));
+   memcpy(frustum, &gCameraInfo.frustum, sizeof(Frustum));
 }
 
 // Method based on the camera control inside of opengl-tutorial.com. As of [2/4/2018]

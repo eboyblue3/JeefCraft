@@ -65,70 +65,34 @@ void computeFrustum(mat4 *mvp, Frustum *frustum) {
    }
 }
 
-// Builds list of verts in world-space
-static void buildVertList(vec *verts, vec *c, float r) {
-   // Top
-   verts[0].x = c->x - r;
-   verts[0].y = c->y + r;
-   verts[0].z = c->z - r;
-   
-   verts[1].x = c->x - r;
-   verts[1].y = c->y + r;
-   verts[1].z = c->z + r;
-
-   verts[2].x = c->x + r;
-   verts[2].y = c->y + r;
-   verts[2].z = c->z + r;
-
-   verts[3].x = c->x + r;
-   verts[3].y = c->y + r;
-   verts[3].z = c->z - r;
-
-   // Bottom
-   verts[4].x = c->x - r;
-   verts[4].y = c->y - r;
-   verts[4].z = c->z - r;
-
-   verts[5].x = c->x - r;
-   verts[5].y = c->y - r;
-   verts[5].z = c->z + r;
-
-   verts[6].x = c->x + r;
-   verts[6].y = c->y - r;
-   verts[6].z = c->z + r;
-
-   verts[7].x = c->x + r;
-   verts[7].y = c->y - r;
-   verts[7].z = c->z - r;
-}
-
-// Algorithm reference from fgiesen blog
-// https://fgiesen.wordpress.com/2010/10/17/view-frustum-culling/
-inline float planeDot(vec *vert, FrustumPlane *plane) {
+// Plane Distance function.
+// Source code referenced from Ogre Rendering Engine's codebase.
+//
+// Copyright (c) 2000-2014 Torus Knot Software Ltd
+// License: MIT
+inline float planeDistance(vec *vert, FrustumPlane *plane) {
    return plane->x * vert->x + plane->y * vert->y + plane->z * vert->z + plane->n;
 }
 
-// Culls square box in world-space
-// Algorithm reference from fgiesen blog
-// https://fgiesen.wordpress.com/2010/10/17/view-frustum-culling/
-bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent) {
-   // Grab 8 verts
-   vec verts[8];
-   buildVertList(verts, center, halfExtent);
+inline F32 vec_dot_abs(vec *a, vec *b) {
+   return fabsf(a->x) * fabsf(b->x) + fabsf(a->y) * fabsf(b->y) + fabs(a->z) * fabsf(b->z);
+}
 
+// Culls square box in world-space
+// Source code referenced from Ogre Rendering Engine's codebase.
+//
+// Copyright (c) 2000-2014 Torus Knot Software Ltd
+// License: MIT
+bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent) {
    for (S32 i = 0; i < FRUSTUM_LOOP_COUNT; ++i) {
       FrustumPlane *plane = &frustum->planes[i];
 
-      if (planeDot(&verts[0], plane) > 0.0f) continue;
-      if (planeDot(&verts[1], plane) > 0.0f) continue;
-      if (planeDot(&verts[2], plane) > 0.0f) continue;
-      if (planeDot(&verts[3], plane) > 0.0f) continue;
-      if (planeDot(&verts[4], plane) > 0.0f) continue;
-      if (planeDot(&verts[5], plane) > 0.0f) continue;
-      if (planeDot(&verts[6], plane) > 0.0f) continue;
-      if (planeDot(&verts[7], plane) > 0.0f) continue;
-
-      return false;
+      F32 dist = planeDistance(center, plane);
+      vec n = vec3(plane->x, plane->y, plane->z);
+      vec half = vec3(halfExtent, halfExtent, halfExtent);
+      F32 maxAbsDist = vec_dot_abs(&n, &half);
+      if (dist < -maxAbsDist)
+         return false;
    }
    return true;
 }

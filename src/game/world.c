@@ -114,7 +114,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 8;
+S32 worldSize = 16;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    // Since x and z can go from -worldSize to worldSize,
