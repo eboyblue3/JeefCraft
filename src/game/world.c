@@ -444,10 +444,13 @@ void renderWorld(F32 dt) {
                gTotalVisibleChunks++;
 
                // Set position.
+               // Center y pos should actually be RENDER_CHUNK_HEIGHT * i
+               // but pos should always be 0 for y since the pos is baked into the y coord.
                vec pos = vec3(x * CHUNK_WIDTH, 0, z * CHUNK_WIDTH);
                vec center;
                vec halfExtents = vec3(CHUNK_WIDTH / 2.0f, RENDER_CHUNK_HEIGHT / 2.0f, CHUNK_WIDTH / 2.0f);
                vec_add(&center, &pos, &halfExtents);
+               center.y += (F32)(i * RENDER_CHUNK_HEIGHT); // We add since we already have RENDER_CHUNK_HEIGHT / 2.0
 
                // TODO: test frustrum culling
                if (FrustumCullSquareBox(&frustum, &center, CHUNK_WIDTH / 2.0f)) {
