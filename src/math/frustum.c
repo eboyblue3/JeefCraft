@@ -24,35 +24,35 @@
 // Note: This code assumes OpenGL model for now. If "D3D space" is needed, we will
 // need to implement it. Note that element access to the combo matrix is in column major order.
 void computeFrustum(mat4 *mvp, Frustum *frustum) {
-   frustum->planes[FRUSTUM_LEFT].x = mvp->m[3].x + mvp->m[0].x;
-   frustum->planes[FRUSTUM_LEFT].y = mvp->m[3].y + mvp->m[0].y;
-   frustum->planes[FRUSTUM_LEFT].z = mvp->m[3].z + mvp->m[0].z;
-   frustum->planes[FRUSTUM_LEFT].n = mvp->m[3].w + mvp->m[0].w;
+   frustum->planes[FRUSTUM_LEFT].x = mvp->m[0].w + mvp->m[0].x;
+   frustum->planes[FRUSTUM_LEFT].y = mvp->m[1].w + mvp->m[1].x;
+   frustum->planes[FRUSTUM_LEFT].z = mvp->m[2].w + mvp->m[2].x;
+   frustum->planes[FRUSTUM_LEFT].n = mvp->m[3].w + mvp->m[3].x;
 
-   frustum->planes[FRUSTUM_RIGHT].x = mvp->m[3].x - mvp->m[0].x;
-   frustum->planes[FRUSTUM_RIGHT].y = mvp->m[3].y - mvp->m[0].y;
-   frustum->planes[FRUSTUM_RIGHT].z = mvp->m[3].z - mvp->m[0].z;
-   frustum->planes[FRUSTUM_RIGHT].n = mvp->m[3].w - mvp->m[0].w;
+   frustum->planes[FRUSTUM_RIGHT].x = mvp->m[0].w - mvp->m[0].x;
+   frustum->planes[FRUSTUM_RIGHT].y = mvp->m[1].w - mvp->m[1].x;
+   frustum->planes[FRUSTUM_RIGHT].z = mvp->m[2].w - mvp->m[2].x;
+   frustum->planes[FRUSTUM_RIGHT].n = mvp->m[3].w - mvp->m[3].x;
 
-   frustum->planes[FRUSTUM_TOP].x = mvp->m[3].x - mvp->m[1].x;
-   frustum->planes[FRUSTUM_TOP].y = mvp->m[3].y - mvp->m[1].y;
-   frustum->planes[FRUSTUM_TOP].z = mvp->m[3].z - mvp->m[1].z;
-   frustum->planes[FRUSTUM_TOP].n = mvp->m[3].w - mvp->m[1].w;
+   frustum->planes[FRUSTUM_TOP].x = mvp->m[0].w - mvp->m[0].y;
+   frustum->planes[FRUSTUM_TOP].y = mvp->m[1].w - mvp->m[1].y;
+   frustum->planes[FRUSTUM_TOP].z = mvp->m[2].w - mvp->m[2].y;
+   frustum->planes[FRUSTUM_TOP].n = mvp->m[3].w - mvp->m[3].y;
 
-   frustum->planes[FRUSTUM_BOTTOM].x = mvp->m[3].x + mvp->m[1].x;
-   frustum->planes[FRUSTUM_BOTTOM].y = mvp->m[3].y + mvp->m[1].y;
-   frustum->planes[FRUSTUM_BOTTOM].z = mvp->m[3].z + mvp->m[1].z;
-   frustum->planes[FRUSTUM_BOTTOM].n = mvp->m[3].w + mvp->m[1].w;
+   frustum->planes[FRUSTUM_BOTTOM].x = mvp->m[0].w + mvp->m[0].y;
+   frustum->planes[FRUSTUM_BOTTOM].y = mvp->m[1].w + mvp->m[1].y;
+   frustum->planes[FRUSTUM_BOTTOM].z = mvp->m[2].w + mvp->m[2].y;
+   frustum->planes[FRUSTUM_BOTTOM].n = mvp->m[3].w + mvp->m[3].y;
 
-   frustum->planes[FRUSTUM_NEAR].x = mvp->m[3].x + mvp->m[2].x;
-   frustum->planes[FRUSTUM_NEAR].y = mvp->m[3].y + mvp->m[2].y;
-   frustum->planes[FRUSTUM_NEAR].z = mvp->m[3].z + mvp->m[2].z;
-   frustum->planes[FRUSTUM_NEAR].n = mvp->m[3].w + mvp->m[2].w;
+   frustum->planes[FRUSTUM_NEAR].x = mvp->m[0].w + mvp->m[0].z;
+   frustum->planes[FRUSTUM_NEAR].y = mvp->m[1].w + mvp->m[1].z;
+   frustum->planes[FRUSTUM_NEAR].z = mvp->m[2].w + mvp->m[2].z;
+   frustum->planes[FRUSTUM_NEAR].n = mvp->m[3].w + mvp->m[3].z;
 
-   frustum->planes[FRUSTUM_FAR].x = mvp->m[3].x - mvp->m[2].x;
-   frustum->planes[FRUSTUM_FAR].y = mvp->m[3].y - mvp->m[2].y;
-   frustum->planes[FRUSTUM_FAR].z = mvp->m[3].z - mvp->m[2].z;
-   frustum->planes[FRUSTUM_FAR].n = mvp->m[3].w - mvp->m[2].w;
+   frustum->planes[FRUSTUM_FAR].x = mvp->m[0].w - mvp->m[0].z;
+   frustum->planes[FRUSTUM_FAR].y = mvp->m[1].w - mvp->m[1].z;
+   frustum->planes[FRUSTUM_FAR].z = mvp->m[2].w - mvp->m[2].z;
+   frustum->planes[FRUSTUM_FAR].n = mvp->m[3].w - mvp->m[3].z;
 
    // Normalize.
    for (S32 i = 0; i < FRUSTUM_LOOP_COUNT; ++i) {
@@ -105,7 +105,7 @@ static void buildVertList(vec *verts, vec *c, float r) {
 // Algorithm reference from fgiesen blog
 // https://fgiesen.wordpress.com/2010/10/17/view-frustum-culling/
 inline float planeDot(vec *vert, FrustumPlane *plane) {
-   return vert->x * plane->x + vert->y * plane->y + vert->z * plane->z + /*1.0f * */plane->n;
+   return plane->x * vert->x + plane->y * vert->y + plane->z * vert->z + plane->n;
 }
 
 // Culls square box in world-space
@@ -118,10 +118,17 @@ bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent) {
 
    for (S32 i = 0; i < FRUSTUM_LOOP_COUNT; ++i) {
       FrustumPlane *plane = &frustum->planes[i];
-      for (S32 j = 0; j < 8; ++j) {
-         if (planeDot(&verts[j], plane) > 0.0f)
-            return true;
-      }
+
+      if (planeDot(&verts[0], plane) > 0.0f) continue;
+      if (planeDot(&verts[1], plane) > 0.0f) continue;
+      if (planeDot(&verts[2], plane) > 0.0f) continue;
+      if (planeDot(&verts[3], plane) > 0.0f) continue;
+      if (planeDot(&verts[4], plane) > 0.0f) continue;
+      if (planeDot(&verts[5], plane) > 0.0f) continue;
+      if (planeDot(&verts[6], plane) > 0.0f) continue;
+      if (planeDot(&verts[7], plane) > 0.0f) continue;
+
+      return false;
    }
-   return false;
+   return true;
 }
