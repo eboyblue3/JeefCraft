@@ -74,10 +74,6 @@ inline float planeDistance(vec *vert, FrustumPlane *plane) {
    return plane->x * vert->x + plane->y * vert->y + plane->z * vert->z + plane->n;
 }
 
-inline F32 vec_dot_abs(vec *a, vec *b) {
-   return fabsf(a->x) * fabsf(b->x) + fabsf(a->y) * fabsf(b->y) + fabs(a->z) * fabsf(b->z);
-}
-
 // Culls square box in world-space
 // Source code referenced from Ogre Rendering Engine's codebase.
 //
@@ -88,9 +84,7 @@ bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent) {
       FrustumPlane *plane = &frustum->planes[i];
 
       F32 dist = planeDistance(center, plane);
-      vec n = vec3(plane->x, plane->y, plane->z);
-      vec half = vec3(halfExtent, halfExtent, halfExtent);
-      F32 maxAbsDist = vec_dot_abs(&n, &half);
+      F32 maxAbsDist = fabsf(plane->x) * halfExtent + fabsf(plane->y) * halfExtent + fabsf(plane->z) * halfExtent;
       if (dist < -maxAbsDist)
          return false;
    }
