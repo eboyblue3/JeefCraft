@@ -26,33 +26,33 @@
 void computeFrustum(mat4 *mvp, Frustum *frustum) {
    frustum->planes[FRUSTUM_LEFT].x = mvp->m[3].x + mvp->m[0].x;
    frustum->planes[FRUSTUM_LEFT].y = mvp->m[3].y + mvp->m[0].y;
-   frustum->planes[FRUSTUM_LEFT].x = mvp->m[3].z + mvp->m[0].z;
-   frustum->planes[FRUSTUM_LEFT].y = mvp->m[3].w + mvp->m[0].w;
+   frustum->planes[FRUSTUM_LEFT].z = mvp->m[3].z + mvp->m[0].z;
+   frustum->planes[FRUSTUM_LEFT].n = mvp->m[3].w + mvp->m[0].w;
 
    frustum->planes[FRUSTUM_RIGHT].x = mvp->m[3].x - mvp->m[0].x;
    frustum->planes[FRUSTUM_RIGHT].y = mvp->m[3].y - mvp->m[0].y;
-   frustum->planes[FRUSTUM_RIGHT].x = mvp->m[3].z - mvp->m[0].z;
-   frustum->planes[FRUSTUM_RIGHT].y = mvp->m[3].w - mvp->m[0].w;
+   frustum->planes[FRUSTUM_RIGHT].z = mvp->m[3].z - mvp->m[0].z;
+   frustum->planes[FRUSTUM_RIGHT].n = mvp->m[3].w - mvp->m[0].w;
 
    frustum->planes[FRUSTUM_TOP].x = mvp->m[3].x - mvp->m[1].x;
    frustum->planes[FRUSTUM_TOP].y = mvp->m[3].y - mvp->m[1].y;
-   frustum->planes[FRUSTUM_TOP].x = mvp->m[3].z - mvp->m[1].z;
-   frustum->planes[FRUSTUM_TOP].y = mvp->m[3].w - mvp->m[1].w;
+   frustum->planes[FRUSTUM_TOP].z = mvp->m[3].z - mvp->m[1].z;
+   frustum->planes[FRUSTUM_TOP].n = mvp->m[3].w - mvp->m[1].w;
 
    frustum->planes[FRUSTUM_BOTTOM].x = mvp->m[3].x + mvp->m[1].x;
    frustum->planes[FRUSTUM_BOTTOM].y = mvp->m[3].y + mvp->m[1].y;
-   frustum->planes[FRUSTUM_BOTTOM].x = mvp->m[3].z + mvp->m[1].z;
-   frustum->planes[FRUSTUM_BOTTOM].y = mvp->m[3].w + mvp->m[1].w;
+   frustum->planes[FRUSTUM_BOTTOM].z = mvp->m[3].z + mvp->m[1].z;
+   frustum->planes[FRUSTUM_BOTTOM].n = mvp->m[3].w + mvp->m[1].w;
 
    frustum->planes[FRUSTUM_NEAR].x = mvp->m[3].x + mvp->m[2].x;
    frustum->planes[FRUSTUM_NEAR].y = mvp->m[3].y + mvp->m[2].y;
-   frustum->planes[FRUSTUM_NEAR].x = mvp->m[3].z + mvp->m[2].z;
-   frustum->planes[FRUSTUM_NEAR].y = mvp->m[3].w + mvp->m[2].w;
+   frustum->planes[FRUSTUM_NEAR].z = mvp->m[3].z + mvp->m[2].z;
+   frustum->planes[FRUSTUM_NEAR].n = mvp->m[3].w + mvp->m[2].w;
 
    frustum->planes[FRUSTUM_FAR].x = mvp->m[3].x - mvp->m[2].x;
    frustum->planes[FRUSTUM_FAR].y = mvp->m[3].y - mvp->m[2].y;
-   frustum->planes[FRUSTUM_FAR].x = mvp->m[3].z - mvp->m[2].z;
-   frustum->planes[FRUSTUM_FAR].y = mvp->m[3].w - mvp->m[2].w;
+   frustum->planes[FRUSTUM_FAR].z = mvp->m[3].z - mvp->m[2].z;
+   frustum->planes[FRUSTUM_FAR].n = mvp->m[3].w - mvp->m[2].w;
 
    // Normalize.
    for (S32 i = 0; i < FRUSTUM_LOOP_COUNT; ++i) {
