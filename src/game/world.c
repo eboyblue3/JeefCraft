@@ -247,7 +247,7 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                bool isOpaqueNegativeZ = false;
                bool isOpaquePositiveZ = false;
 
-               if (x == 0 && chunkX > 0) {
+               if (x == 0 && chunkX > -worldSize) {
                   Cube *behindData = getChunkAt(chunkX - 1, chunkZ)->cubeData;
                   if (!isTransparent(behindData, CHUNK_WIDTH - 1, y, z)) {
                      // The cube behind us on the previous chunk is in fact
@@ -263,7 +263,7 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                      isOpaquePositiveX = true;
                   }
                }
-               if (z == 0 && chunkZ > 0) {
+               if (z == 0 && chunkZ > -worldSize) {
                   Cube *behindData = getChunkAt(chunkX, chunkZ - 1)->cubeData;
                   if (!isTransparent(behindData, x, y, CHUNK_WIDTH - 1)) {
                      // The cube behind us on the previous chunk is in fact
