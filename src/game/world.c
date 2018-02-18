@@ -83,8 +83,10 @@ typedef enum Materials {
    Material_Air,
    Material_Bedrock,
    Material_Dirt,
-   Material_Grass,     // Also note that bottoms of grass have dirt blocks.
-   Material_Grass_Side // Sides of grass have a special texture.
+   Material_Grass,      // Also note that bottoms of grass have dirt blocks.
+   Material_Grass_Side, // Sides of grass have a special texture.
+   Material_Wood_Trunk,
+   Material_Leaves
 } Material;
 
 // TODO: store a list of pointers of RenderChunk array (RenderChunk**)
@@ -186,8 +188,17 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
          // calculate height for each cube.
          // Taking absolute value will allow for only 0-1 scaling.
          // also make sure to use the world coordinates
-         F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 40.0);
-         S32 height = (S32)(noise);
+
+         // Smoothen the noise based on 5 blocks surrounding it.
+         F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 10.0);
+         for (S32 i = -5; i < 5; ++i) {
+            for (S32 j = -5; j < 5; ++j) {
+               noise += fabs(open_simplex_noise2(osn, (F64)(x + i + worldX) / (stretchFactor + i), (F64)(z + j + worldZ) / (stretchFactor + j)) * (10.0 + j)) / 2.0f;
+            }
+            noise /= 10.f;
+         }
+         //F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 10.0);
+         S32 height = (S32)(noise) + 60.0f; // 60 as base height.
 
          // Make block at height level grass.
          getCubeAt(cubeData, x, height, z)->material = Material_Grass;
@@ -212,6 +223,44 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
       }
    }
 
+   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
+      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
+         // Find the height. Skip over anything that isn't the height.
+         // and we only care about grass.
+         S32 height = MAX_CHUNK_HEIGHT - 1;
+         for (; height >= 0; --height) {
+            if (getCubeAt(cubeData, x, height, z)->material != Material_Air) {
+               break;
+            }
+         }
+
+         if (getCubeAt(cubeData, x, height, z)->material == Material_Grass) {
+            // Lets generate some trees.
+            //
+            // Also, a tree only has a 1/10 chance of spawning on this block.
+            S32 posX = x;
+            S32 posZ = z;
+            if (open_simplex_noise2(osn, (F64)posX + worldX, (F64)posZ + worldZ) >= 0.8) {
+               getCubeAt(cubeData, x, height + 1, z)->material = Material_Wood_Trunk;
+               getCubeAt(cubeData, x, height + 2, z)->material = Material_Wood_Trunk;
+               getCubeAt(cubeData, x, height + 3, z)->material = Material_Wood_Trunk;
+               for (S32 xxx = x - 3; xxx < x + 3; ++xxx) {
+                  if (xxx >= CHUNK_WIDTH)
+                     break;
+                  else if (xxx < 0)
+                     continue;
+                  for (S32 zzz = z - 3; zzz < z + 3; ++zzz) {
+                     if (zzz >= CHUNK_WIDTH)
+                        break;
+                     else if (zzz < 0)
+                        continue;
+                     getCubeAt(cubeData, xxx, height + 4, zzz)->material = Material_Leaves;
+                  }
+               }
+            }
+         }
+      }
+   }
 }
 
 F32 getViewDistance() {
@@ -286,11 +335,18 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
 
                S32 material = getCubeAt(cubeData, x, y, z)->material;
 
-               if (y == 0 || isTransparent(cubeData, x, y - 1, z))
-                  buildFace(chunk, i, CubeSides_Down, material, &localPos);
-
                if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
                   buildFace(chunk, i, CubeSides_Up, material, &localPos);
+
+               // If this is grass, bottom has to be dirt.
+
+               if (y == 0 || isTransparent(cubeData, x, y - 1, z))
+                  buildFace(chunk, i, CubeSides_Down, (material == Material_Grass ? Material_Dirt : material), &localPos);
+
+               // After we built the top, this is a special case for grass.
+               // If we are actually building grass sides it has to be special.
+               if (material == Material_Grass)
+                  material = Material_Grass_Side;
 
                if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
                   buildFace(chunk, i, CubeSides_West, material, &localPos);

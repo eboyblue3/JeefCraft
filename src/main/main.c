@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
    char fpsBuffer[FPS_BUFFER_SIZE];
 
    // Set initial camera position
-   vec cameraPos = vec3(-5.0f, 10.0f, 0.0f);
+   vec cameraPos = vec3(-5.0f, 80.0f, 0.0f);
    setCameraPosition(&cameraPos);
 
    // Set projection matrix
