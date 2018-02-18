@@ -27,6 +27,7 @@
 #include "graphics/shader.h"
 #include "graphics/texture2d.h"
 #include "math/frustum.h"
+#include "platform/input.h"
 
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
@@ -409,6 +410,8 @@ void freeWorld() {
    open_simplex_noise_free(osn);
 }
 
+bool orthoFlag = false;
+
 void renderWorld(F32 dt) {
    // Set GL State
    glEnable(GL_CULL_FACE);
@@ -420,8 +423,23 @@ void renderWorld(F32 dt) {
 
    // proj/view matrix
    mat4 proj, view, projView;
-   getCurrentProjMatrix(&proj);
-   getCurrentViewMatrix(&view);
+
+   if (inputGetKeyStatus(KEY_V) == PRESSED)
+      orthoFlag = true;
+   else
+      orthoFlag = false;
+
+   // For debugging culling
+   if (!orthoFlag) {
+      getCurrentProjMatrix(&proj);
+      getCurrentViewMatrix(&view);
+   } else {
+      mat4_ortho(&proj, -256.0f, 256.0f, -256.0f / (1440.f / 900.f), 256.0f / (1440.f / 900.f), -200.0f, 200.0f);
+      vec eye = vec3(0.0f, 0.0f, 0.0f);
+      vec center = vec3(0.0f, -1.0f, 0.0f);
+      vec up = vec3(1.0f, 0.0f, 0.0f);
+      mat4_lookAt(&view, &eye, &center, &up);
+   }
    mat4_mul(&projView, &proj, &view);
    glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
 

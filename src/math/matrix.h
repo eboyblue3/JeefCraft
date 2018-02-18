@@ -27,6 +27,8 @@ void mat4_setPosition(mat4 *matrix, vec *pos);
 
 void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar);
 
+void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, F32 far);
+
 void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up);
 
 #endif
