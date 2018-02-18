@@ -28,6 +28,10 @@
 #include "game/camera.h"
 #include "game/world.h"
 
+extern S32 gVisibleChunks;
+extern S32 gTotalChunks;
+extern S32 gTotalVisibleChunks;
+
 int main(int argc, char **argv) {
    if (!initPlatform())
       return -1;
@@ -57,12 +61,17 @@ int main(int argc, char **argv) {
    initWorld();
 
    S32 fpsCounter = 0;
-#define FPS_BUFFER_SIZE 128
+#define FPS_BUFFER_SIZE 256
    char fpsBuffer[FPS_BUFFER_SIZE];
 
    // Set initial camera position
    vec cameraPos = vec3(-5.0f, 10.0f, 0.0f);
    setCameraPosition(&cameraPos);
+
+   // Set projection matrix
+   mat4 proj;
+   mat4_perspective(&proj, 1.5708f, 1440.0f / 900.0f, 0.01f, getViewDistance());
+   setCameraProjMatrix(&proj);
 
    while (gRunning) {
       // Calculate mouse movement for frame.
@@ -78,7 +87,7 @@ int main(int argc, char **argv) {
          getCameraPosition(&pos);
 
          memset(fpsBuffer, 0, FPS_BUFFER_SIZE);
-         snprintf(fpsBuffer, FPS_BUFFER_SIZE, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f", fpsCounter, (1000.0f / (F32)fpsCounter), pos.x, pos.y, pos.z);
+         snprintf(fpsBuffer, FPS_BUFFER_SIZE, "JeefCraft - FPS: %d mspf: %f Camerapos: %f %f %f Chunks: %d visible | %d visible total | %d chunk total", fpsCounter, (1000.0f / (F32)fpsCounter), pos.x, pos.y, pos.z, gVisibleChunks, gTotalVisibleChunks, gTotalChunks);
          setWindowTitle(&window, fpsBuffer);
 
          // Reset
@@ -86,6 +95,7 @@ int main(int argc, char **argv) {
          secondTime = current;
       }
 
+      // Calculate camera and frustum
       calculateFreecamViewMatrix(delta);
 
       // Perform rendering.

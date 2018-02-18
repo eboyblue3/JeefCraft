@@ -21,6 +21,7 @@
 
 void initWorld();
 void freeWorld();
+F32 getViewDistance();
 void renderWorld(F32 dt);
 
 #endif // _GAME_WORLD_H_

@@ -18,12 +18,15 @@
 #define _CAMERA_H_
 
 #include "base/types.h"
-#include <stb_vec.h>
+#include "math/frustum.h"
 
 void initCamera();
 void getCameraPosition(vec *pos);
 void getCurrentViewMatrix(mat4 *mat);
+void getCurrentProjMatrix(mat4 *mat);
+void setCameraProjMatrix(mat4 *mat);
 void setCameraPosition(vec *pos);
 void calculateFreecamViewMatrix(F32 dt);
+void getCameraFrustum(Frustum *frustum);
 
 #endif

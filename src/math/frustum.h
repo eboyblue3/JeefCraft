@@ -14,21 +14,36 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _MATH_MATRIX_H_
-#define _MATH_MATRIX_H_
+#ifndef _MATH_FRUSTUM_H_
+#define _MATH_FRUSTUM_H_
 
-#include <math.h>
 #include <stb_vec.h>
 #include "base/types.h"
 
-void mat4_getPosition(vec *dest, mat4 *src);
+typedef struct FrustumPlane {
+   F32 x;
+   F32 y;
+   F32 z;
+   F32 n;
+} FrustumPlane;
 
-void mat4_setPosition(mat4 *matrix, vec *pos);
+typedef enum {
+   FRUSTUM_LEFT = 0,
+   FRUSTUM_RIGHT,
+   FRUSTUM_TOP,
+   FRUSTUM_BOTTOM,
+   FRUSTUM_NEAR,
+   FRUSTUM_FAR,
 
-void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar);
+   FRUSTUM_LOOP_COUNT // For Loop Count from left-far
+} FrustumPlaneId;
 
-void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, F32 far);
+typedef struct Frustum {
+   FrustumPlane planes[FRUSTUM_LOOP_COUNT];
+} Frustum;
 
-void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up);
+void computeFrustum(mat4 *mvp, Frustum *frustum);
+
+bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent);
 
 #endif

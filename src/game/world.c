@@ -26,6 +26,8 @@
 #include "game/camera.h"
 #include "graphics/shader.h"
 #include "graphics/texture2d.h"
+#include "math/frustum.h"
+#include "platform/input.h"
 
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
@@ -115,7 +117,13 @@ Chunk *gChunkWorld = NULL;
 S32 worldSize = 16;
 
 Chunk* getChunkAt(S32 x, S32 z) {
-   return &gChunkWorld[(z * (worldSize)) + x];
+   // Since x and z can go from -worldSize to worldSize,
+   // we need to normalize them so that they are always positive.
+   x += worldSize;
+   z += worldSize;
+
+   S32 index = (z * (worldSize * 2)) + x;
+   return &gChunkWorld[index];
 }
 
 GLuint projMatrixLoc;
@@ -206,6 +214,11 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
 
 }
 
+F32 getViewDistance() {
+   // Give 1 chunk 'padding' looking forward.
+   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
+}
+
 inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
    return getCubeAt(cubeData, x, y, z)->material == Material_Air;
 }
@@ -235,7 +248,7 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                bool isOpaqueNegativeZ = false;
                bool isOpaquePositiveZ = false;
 
-               if (x == 0 && chunkX > 0) {
+               if (x == 0 && chunkX > -worldSize) {
                   Cube *behindData = getChunkAt(chunkX - 1, chunkZ)->cubeData;
                   if (!isTransparent(behindData, CHUNK_WIDTH - 1, y, z)) {
                      // The cube behind us on the previous chunk is in fact
@@ -251,7 +264,7 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                      isOpaquePositiveX = true;
                   }
                }
-               if (z == 0 && chunkZ > 0) {
+               if (z == 0 && chunkZ > -worldSize) {
                   Cube *behindData = getChunkAt(chunkX, chunkZ - 1)->cubeData;
                   if (!isTransparent(behindData, x, y, CHUNK_WIDTH - 1)) {
                      // The cube behind us on the previous chunk is in fact
@@ -304,8 +317,8 @@ void uploadGeometryToGL() {
    // Note if a chunk has no geometry we don't create a vbo
    //
    // TODO: use VAO if extension is supported??
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             RenderChunk *r = &getChunkAt(x, z)->renderChunks[i];
             if (r->vertexCount > 0) {
@@ -328,6 +341,10 @@ void uploadGeometryToGL() {
    }
 }
 
+int gVisibleChunks = 0;
+int gTotalVisibleChunks = 0;
+int gTotalChunks = 0;
+
 void initWorld() {
    // Only 2 mip levels.
    bool ret = createTexture2D("Assets/block_atlas.png", 4, 2, &textureAtlas);
@@ -347,12 +364,13 @@ void initWorld() {
    open_simplex_noise((U64)0xDEADBEEF, &osn);
 
    // world grid
-   gChunkWorld = (Chunk*)calloc(worldSize * worldSize, sizeof(Chunk));
+   gChunkWorld = (Chunk*)calloc((worldSize * 2) * (worldSize * 2), sizeof(Chunk));
+   gTotalChunks = worldSize * 2 * worldSize * 2 * CHUNK_SPLITS;
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          // World position calcuation before passing.
          generateWorld(x, z, x * CHUNK_WIDTH, z * CHUNK_WIDTH);
       }
@@ -362,8 +380,8 @@ void initWorld() {
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          generateGeometry(x, z);
       }
    }
@@ -374,8 +392,8 @@ void initWorld() {
 }
 
 void freeWorld() {
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
          free(c->cubeData);
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
@@ -392,6 +410,8 @@ void freeWorld() {
    open_simplex_noise_free(osn);
 }
 
+bool orthoFlag = false;
+
 void renderWorld(F32 dt) {
    // Set GL State
    glEnable(GL_CULL_FACE);
@@ -403,8 +423,23 @@ void renderWorld(F32 dt) {
 
    // proj/view matrix
    mat4 proj, view, projView;
-   mat4_perspective(&proj, 1.5708f, 1440.0f / 900.0f, 0.01f, (F32)(CHUNK_WIDTH * worldSize));
-   getCurrentViewMatrix(&view);
+
+   if (inputGetKeyStatus(KEY_V) == PRESSED)
+      orthoFlag = true;
+   else
+      orthoFlag = false;
+
+   // For debugging culling
+   if (!orthoFlag) {
+      getCurrentProjMatrix(&proj);
+      getCurrentViewMatrix(&view);
+   } else {
+      mat4_ortho(&proj, -256.0f, 256.0f, -256.0f / (1440.f / 900.f), 256.0f / (1440.f / 900.f), -200.0f, 200.0f);
+      vec eye = vec3(0.0f, 0.0f, 0.0f);
+      vec center = vec3(0.0f, -1.0f, 0.0f);
+      vec up = vec3(1.0f, 0.0f, 0.0f);
+      mat4_lookAt(&view, &eye, &center, &up);
+   }
    mat4_mul(&projView, &proj, &view);
    glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
 
@@ -413,25 +448,44 @@ void renderWorld(F32 dt) {
    glBindTexture(GL_TEXTURE_2D, textureAtlas.glId);
    glUniform1i(textureLoc, 0);
 
-   for (S32 x = 0; x < worldSize; ++x) {
-      for (S32 z = 0; z < worldSize; ++z) {
+   gVisibleChunks = 0;
+   gTotalVisibleChunks = 0;
+
+   Frustum frustum;
+   getCameraFrustum(&frustum);
+
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             if (c->renderChunks[i].vertexCount > 0) {
+               gTotalVisibleChunks++;
 
                // Set position.
+               // Center y pos should actually be RENDER_CHUNK_HEIGHT * i
+               // but pos should always be 0 for y since the pos is baked into the y coord.
                vec pos = vec3(x * CHUNK_WIDTH, 0, z * CHUNK_WIDTH);
-               mat4 modelMatrix;
-               mat4_identity(&modelMatrix);
-               mat4_setPosition(&modelMatrix, &pos);
-               glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
-               glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
-               glEnableVertexAttribArray(0);
-               glEnableVertexAttribArray(1);
-               glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, position));
-               glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
-               glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
-               glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
+               vec center;
+               vec halfExtents = vec3(CHUNK_WIDTH / 2.0f, RENDER_CHUNK_HEIGHT / 2.0f, CHUNK_WIDTH / 2.0f);
+               vec_add(&center, &pos, &halfExtents);
+               center.y += (F32)(i * RENDER_CHUNK_HEIGHT); // We add since we already have RENDER_CHUNK_HEIGHT / 2.0
+
+               // TODO: test frustrum culling
+               if (FrustumCullSquareBox(&frustum, &center, CHUNK_WIDTH / 2.0f)) {
+                  mat4 modelMatrix;
+                  mat4_identity(&modelMatrix);
+                  mat4_setPosition(&modelMatrix, &pos);
+                  glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
+                  glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
+                  glEnableVertexAttribArray(0);
+                  glEnableVertexAttribArray(1);
+                  glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, position));
+                  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
+                  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
+                  glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
+
+                  gVisibleChunks++;
+               }
             }
          }
       }

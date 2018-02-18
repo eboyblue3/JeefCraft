@@ -14,6 +14,7 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
+#include <string.h>
 #include "math/matrix.h"
 
 void mat4_getPosition(vec *dest, mat4 *src) {
@@ -47,6 +48,19 @@ void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar) {
    dest->m[3].y = 0.0f;
    dest->m[3].z = -((2.0f * zFar * zNear) / (zFar - zNear));
    dest->m[3].w = 0.0f;
+}
+
+void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, F32 far) {
+   memset(dest, 0, sizeof(mat4));
+
+   dest->m[0].x = 2.0f / (right - left);
+   dest->m[1].y = 2.0f / (top - bottom);
+   dest->m[2].z = 2.0f / (near - far);
+   dest->m[3].w = 1.0f;
+
+   dest->m[3].x = (left + right) / (left - right);
+   dest->m[3].y = (bottom + top) / (bottom - top);
+   dest->m[3].z = (far + near) / (near - far);
 }
 
 void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up) {
