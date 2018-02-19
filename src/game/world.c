@@ -116,7 +116,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 16;
+S32 worldSize = 8;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    // Since x and z can go from -worldSize to worldSize,
@@ -222,6 +222,37 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
          }
       }
    }
+
+   F64 cave_stretch = 16.0;
+
+   // Generate caves.
+   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
+      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
+         for (S32 y = 0; y < MAX_CHUNK_HEIGHT; ++y) {
+            Cube *c = getCubeAt(cubeData, x, y, z);
+            if (c->material == Material_Bedrock)
+               continue;
+            if (c->material == Material_Air)
+               break;
+
+            F64 noise = 0.0;
+            for (S32 i = 0; i < 5; ++i) {
+               noise += (open_simplex_noise3(
+                  osn, 
+                  (F64)(worldX + x) / cave_stretch * (F64)(1 << i), 
+                  (F64)y / cave_stretch * (F64)(1 << (i + 1)), 
+                  (F64)(worldZ + z) / cave_stretch * (F64)(1 << i)
+               ) + 1.0) / (F64)(1 << (i + 1));
+            }
+            if (noise > 1.15) {
+               // It's a cave, carve out air.
+               c->material = Material_Air;
+            }
+         }
+      }
+   }
+
+   // Generate Trees
 
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
