@@ -152,8 +152,8 @@ void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, vec *localPos) {
       v.position.y = cubes[side][i][1] + localPos->y;
       v.position.z = cubes[side][i][2] + localPos->z;
       v.position.w = cubes[side][i][3];
-      v.uvs.x = (cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
-      v.uvs.y = (cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvs.x = (F32)(cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvs.y = (F32)(cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
       sb_push(renderChunk->vertexData, v);
    }
    renderChunk->vertexCount += 4;
@@ -410,9 +410,6 @@ void initWorld() {
 
    // Create shader
    generateShaderProgram("Shaders/basic.vert", "Shaders/basic.frag", &program);
-   // bind attrib locations
-   glBindAttribLocation(program, 0, "position");
-   glBindAttribLocation(program, 1, "uvs");
    projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
    modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
    textureLoc = glGetUniformLocation(program, "textureAtlas");
