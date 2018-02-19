@@ -268,7 +268,7 @@ F32 getViewDistance() {
    return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
 }
 
-inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
+static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
    return getCubeAt(cubeData, x, y, z)->material == Material_Air;
 }
 

@@ -33,9 +33,12 @@ endif()
 set(THIRDPARTY_DIR "<path here>" CACHE PATH "Sets the ThirdParty directory")
 set(EXECUTABLE_NAME "JeefCraft" CACHE STRING "Sets the name of the executable")
 
+#Find OpenGL
+find_package(OpenGL REQUIRED)
+
 # GLEW build
 add_library(glew STATIC "${THIRDPARTY_DIR}/glew/src/glew.c")
-target_include_directories(glew PUBLIC "${THIRDPARTY_DIR}/glew/include")
+target_include_directories(glew PUBLIC "${THIRDPARTY_DIR}/glew/include" ${OPENGL_INCLUDE_DIR})
 target_compile_definitions(glew PUBLIC GLEW_STATIC)
 
 # Open Simplex Noise build
@@ -79,16 +82,16 @@ set(JEEFCRAFT_SRC
 )
 add_executable(${EXECUTABLE_NAME} ${JEEFCRAFT_SRC})
 target_link_libraries(${EXECUTABLE_NAME}
+	${OPENGL_LIBRARIES}
 	glfw
 	glew
-	open_simplex_noise
+	open_simplex_noise	
 )
 
 # Platform specific library linking.
 if (MSVC)
 	target_link_libraries(${EXECUTABLE_NAME} 
-		kernel32.lib 
-		opengl32.lib
+		kernel32.lib
 	)
 
 	# Files must be set to compile with the C++ compiler on MSVC
@@ -96,16 +99,12 @@ if (MSVC)
 	set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINKER_LANGUAGE CXX)	
 elseif(APPLE)
 	target_link_libraries(${EXECUTABLE_NAME} 
-		"-framework OpenGL"
 		"-framework Cocoa"
-	)
-elseif(UNIX)
-	target_link_libraries(${EXECUTABLE_NAME} 
-		GL
 	)
 endif()
 
 target_include_directories(${EXECUTABLE_NAME}
+	PUBLIC ${OPENGL_INCLUDE_DIR}
 	PUBLIC "${THIRDPARTY_DIR}/glfw3/include"
 	PUBLIC "${THIRDPARTY_DIR}/stb"
 	PUBLIC "${THIRDPARTY_DIR}/opensimplexnoise/"

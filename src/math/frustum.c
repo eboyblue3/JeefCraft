@@ -70,7 +70,7 @@ void computeFrustum(mat4 *mvp, Frustum *frustum) {
 //
 // Copyright (c) 2000-2014 Torus Knot Software Ltd
 // License: MIT
-inline float planeDistance(vec *vert, FrustumPlane *plane) {
+static inline float planeDistance(vec *vert, FrustumPlane *plane) {
    return plane->x * vert->x + plane->y * vert->y + plane->z * vert->z + plane->n;
 }
 
