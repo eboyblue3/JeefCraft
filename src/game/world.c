@@ -116,7 +116,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 8;
+S32 worldSize = 4;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    // Since x and z can go from -worldSize to worldSize,
@@ -167,6 +167,71 @@ void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, vec *localPos) {
    sb_push(renderChunk->indices, in + 2);
    renderChunk->currentIndex += 4;
    renderChunk->indiceCount += 6;
+}
+
+F32 getViewDistance() {
+   // Give 1 chunk 'padding' looking forward.
+   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
+}
+
+static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
+   return getCubeAt(cubeData, x, y, z)->material == Material_Air;
+}
+
+static inline bool isTransparentAtCube(Cube *c) {
+   if (c == NULL)
+      return false;
+   return c->material == Material_Air;
+}
+
+static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
+   // first calculate chunk based upon position.
+   S32 chunkX = x / CHUNK_WIDTH;
+   S32 chunkZ = z / CHUNK_WIDTH;
+
+   if (x < 0)
+      --chunkX;
+   if (z < 0)
+      --chunkZ;
+
+   // Don't go past.
+   if (chunkX < -worldSize || chunkX >= worldSize || chunkZ < -worldSize || chunkZ >= worldSize)
+      return NULL;
+
+   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+
+   S32 localChunkX = x - (chunkX * CHUNK_WIDTH);
+   S32 localChunkZ = z - (chunkZ * CHUNK_WIDTH);
+
+   return getCubeAt(chunk->cubeData, localChunkX, y, localChunkZ);
+}
+
+// Worldspace
+static bool shouldCave(S32 x, S32 y, S32 z) {
+   F64 cave_stretch = 32.0;
+
+   F64 noise = 0.0;
+   for (S32 i = 0; i < 7; ++i) {
+      noise += (open_simplex_noise3(
+         osn,
+         (F64)(x) / cave_stretch * (F64)(1 << i),
+         (F64)y / cave_stretch * (F64)(1 << (i + 1)),
+         (F64)(z) / cave_stretch * (F64)(1 << i)
+      ) + 1.0) / (F64)(1 << (i + 1));
+   }
+
+   return noise >= 1.295;
+}
+
+static S32 solidCubesAroundCubeAt(S32 x, S32 y, S32 z, S32 worldX, S32 worldZ) {
+   S32 solidCount = 0;
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX - 1, y, z + worldZ)) && !shouldCave(x + worldX - 1, y, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX + 1, y, z + worldZ)) && !shouldCave(x + worldX + 1, y, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y - 1, z + worldZ)) && !shouldCave(x + worldX, y - 1, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y + 1, z + worldZ)) && !shouldCave(x + worldX, y + 1, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y, z - 1 + worldZ)) && !shouldCave(x + worldX, y, z - 1 + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y, z + 1 + worldZ)) && !shouldCave(x + worldX, y, z + 1 + worldZ);
+   return solidCount;
 }
 
 void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
@@ -222,8 +287,12 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
          }
       }
    }
+}
 
-   F64 cave_stretch = 16.0;
+void generateCavesAndStructures(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
+
+   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+   Cube *cubeData = chunk->cubeData;
 
    // Generate caves.
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
@@ -235,25 +304,19 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
             if (c->material == Material_Air)
                break;
 
-            F64 noise = 0.0;
-            for (S32 i = 0; i < 5; ++i) {
-               noise += (open_simplex_noise3(
-                  osn, 
-                  (F64)(worldX + x) / cave_stretch * (F64)(1 << i), 
-                  (F64)y / cave_stretch * (F64)(1 << (i + 1)), 
-                  (F64)(worldZ + z) / cave_stretch * (F64)(1 << i)
-               ) + 1.0) / (F64)(1 << (i + 1));
-            }
-            if (noise > 1.15) {
-               // It's a cave, carve out air.
-               c->material = Material_Air;
+            if (shouldCave(x + worldX, y, z + worldZ)) {
+               // Perform smothing.
+               S32 solidCount = solidCubesAroundCubeAt(x, y, z, worldX, worldZ);
+               if (solidCount < 4) {
+                  // It's a cave, carve out air.
+                  c->material = Material_Air;
+               }
             }
          }
       }
    }
 
    // Generate Trees
-
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
          // Find the height. Skip over anything that isn't the height.
@@ -292,15 +355,6 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
          }
       }
    }
-}
-
-F32 getViewDistance() {
-   // Give 1 chunk 'padding' looking forward.
-   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
-}
-
-static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
-   return getCubeAt(cubeData, x, y, z)->material == Material_Air;
 }
 
 void generateGeometry(S32 chunkX, S32 chunkZ) {
@@ -453,6 +507,7 @@ void initWorld() {
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
+//#pragma omp parallel for
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          // World position calcuation before passing.
@@ -462,8 +517,17 @@ void initWorld() {
 
    // TODO MULTITHREADED: sync here before generating the Geometry.
 
+   // Generate caves and tree
+//#pragma omp parallel for
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
+         generateCavesAndStructures(x, z, x * CHUNK_WIDTH, z * CHUNK_WIDTH);
+      }
+   }
+
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
+//#pragma omp parallel for
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          generateGeometry(x, z);
