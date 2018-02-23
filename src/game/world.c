@@ -116,7 +116,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 4;
+S32 worldSize = 16;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    // Since x and z can go from -worldSize to worldSize,
@@ -208,19 +208,21 @@ static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
 
 // Worldspace
 static bool shouldCave(S32 x, S32 y, S32 z) {
-   F64 cave_stretch = 32.0;
+   F64 cave_stretch = 24.0;
 
    F64 noise = 0.0;
-   for (S32 i = 0; i < 7; ++i) {
+   for (S32 i = 0; i < 6; ++i) {
+      F64 factor = cave_stretch * ((F64)((1 << i) / 3) + 1.0);
+
       noise += (open_simplex_noise3(
          osn,
-         (F64)(x) / cave_stretch * (F64)(1 << i),
-         (F64)y / cave_stretch * (F64)(1 << (i + 1)),
-         (F64)(z) / cave_stretch * (F64)(1 << i)
+         (F64)(x) / factor * (F64)(1 << i),
+         (F64)y / factor * (F64)(1 << (i + 1)),
+         (F64)(z) / factor * (F64)(1 << i)
       ) + 1.0) / (F64)(1 << (i + 1));
    }
 
-   return noise >= 1.295;
+   return noise >= 1.33;
 }
 
 static S32 solidCubesAroundCubeAt(S32 x, S32 y, S32 z, S32 worldX, S32 worldZ) {
