@@ -46,12 +46,12 @@ static F32 cubes[6][4][4] = {
 };
 
 static F32 cubeUVs[6][4][2] = {
-   { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // East
+   { { 0, 1 }, { 0, 0 }, { 1, 0 }, { 1, 1 } }, // East
    { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }, // up
-   { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }, // west
+   { { 1, 0 }, { 1, 1 }, { 0, 1 }, { 0, 0 } }, // west
    { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // down
-   { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // north
-   { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } }  // south
+   { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } }, // north
+   { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }  // south
 };
 
 typedef enum CubeSides {
@@ -83,8 +83,10 @@ typedef enum Materials {
    Material_Air,
    Material_Bedrock,
    Material_Dirt,
-   Material_Grass,     // Also note that bottoms of grass have dirt blocks.
-   Material_Grass_Side // Sides of grass have a special texture.
+   Material_Grass,      // Also note that bottoms of grass have dirt blocks.
+   Material_Grass_Side, // Sides of grass have a special texture.
+   Material_Wood_Trunk,
+   Material_Leaves
 } Material;
 
 // TODO: store a list of pointers of RenderChunk array (RenderChunk**)
@@ -150,8 +152,8 @@ void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, vec *localPos) {
       v.position.y = cubes[side][i][1] + localPos->y;
       v.position.z = cubes[side][i][2] + localPos->z;
       v.position.w = cubes[side][i][3];
-      v.uvs.x = (cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
-      v.uvs.y = (cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvs.x = (F32)(cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvs.y = (F32)(cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
       sb_push(renderChunk->vertexData, v);
    }
    renderChunk->vertexCount += 4;
@@ -167,6 +169,73 @@ void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, vec *localPos) {
    renderChunk->indiceCount += 6;
 }
 
+F32 getViewDistance() {
+   // Give 1 chunk 'padding' looking forward.
+   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
+}
+
+static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
+   return getCubeAt(cubeData, x, y, z)->material == Material_Air;
+}
+
+static inline bool isTransparentAtCube(Cube *c) {
+   if (c == NULL)
+      return false;
+   return c->material == Material_Air;
+}
+
+static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
+   // first calculate chunk based upon position.
+   S32 chunkX = x / CHUNK_WIDTH;
+   S32 chunkZ = z / CHUNK_WIDTH;
+
+   if (x < 0)
+      --chunkX;
+   if (z < 0)
+      --chunkZ;
+
+   // Don't go past.
+   if (chunkX < -worldSize || chunkX >= worldSize || chunkZ < -worldSize || chunkZ >= worldSize)
+      return NULL;
+
+   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+
+   S32 localChunkX = x - (chunkX * CHUNK_WIDTH);
+   S32 localChunkZ = z - (chunkZ * CHUNK_WIDTH);
+
+   return getCubeAt(chunk->cubeData, localChunkX, y, localChunkZ);
+}
+
+// Worldspace
+static bool shouldCave(S32 x, S32 y, S32 z) {
+   F64 cave_stretch = 24.0;
+
+   F64 noise = 0.0;
+   for (S32 i = 0; i < 6; ++i) {
+      F64 factor = cave_stretch * ((F64)((1 << i) / 3) + 1.0);
+
+      noise += (open_simplex_noise3(
+         osn,
+         (F64)(x) / factor * (F64)(1 << i),
+         (F64)y / factor * (F64)(1 << (i + 1)),
+         (F64)(z) / factor * (F64)(1 << i)
+      ) + 1.0) / (F64)(1 << (i + 1));
+   }
+
+   return noise >= 1.33;
+}
+
+static S32 solidCubesAroundCubeAt(S32 x, S32 y, S32 z, S32 worldX, S32 worldZ) {
+   S32 solidCount = 0;
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX - 1, y, z + worldZ)) && !shouldCave(x + worldX - 1, y, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX + 1, y, z + worldZ)) && !shouldCave(x + worldX + 1, y, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y - 1, z + worldZ)) && !shouldCave(x + worldX, y - 1, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y + 1, z + worldZ)) && !shouldCave(x + worldX, y + 1, z + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y, z - 1 + worldZ)) && !shouldCave(x + worldX, y, z - 1 + worldZ);
+   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y, z + 1 + worldZ)) && !shouldCave(x + worldX, y, z + 1 + worldZ);
+   return solidCount;
+}
+
 void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
    // We modulate divide CHUNK_WIDTH as we keep the grid static
    // no matter where we move around on the map.
@@ -179,15 +248,24 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
    chunk->cubeData = (Cube*)calloc(CHUNK_SIZE, sizeof(Cube));
    Cube *cubeData = chunk->cubeData;
 
-   F64 stretchFactor = 16.0;
+   F64 stretchFactor = 20.0;
 
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
          // calculate height for each cube.
          // Taking absolute value will allow for only 0-1 scaling.
          // also make sure to use the world coordinates
-         F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 40.0);
-         S32 height = (S32)(noise);
+
+         // Smoothen the noise based on 5 blocks surrounding it.
+         F64 noise = (open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor)) * 10.0;
+         for (S32 i = -5; i < 5; ++i) {
+            for (S32 j = -5; j < 5; ++j) {
+               noise += (open_simplex_noise2(osn, (F64)(x + i + worldX) / (stretchFactor + i), (F64)(z + j + worldZ) / (stretchFactor + j)) * (10.0 + j)) / 2.0f;
+            }
+            noise /= 10.f;
+         }
+         //F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 10.0);
+         S32 height = (S32)(noise) + 70.0f; // 70 as base height.
 
          // Make block at height level grass.
          getCubeAt(cubeData, x, height, z)->material = Material_Grass;
@@ -211,16 +289,74 @@ void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
          }
       }
    }
-
 }
 
-F32 getViewDistance() {
-   // Give 1 chunk 'padding' looking forward.
-   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
-}
+void generateCavesAndStructures(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
 
-static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
-   return getCubeAt(cubeData, x, y, z)->material == Material_Air;
+   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+   Cube *cubeData = chunk->cubeData;
+
+   // Generate caves.
+   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
+      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
+         for (S32 y = 0; y < MAX_CHUNK_HEIGHT; ++y) {
+            Cube *c = getCubeAt(cubeData, x, y, z);
+            if (c->material == Material_Bedrock)
+               continue;
+            if (c->material == Material_Air)
+               break;
+
+            if (shouldCave(x + worldX, y, z + worldZ)) {
+               // Perform smothing.
+               S32 solidCount = solidCubesAroundCubeAt(x, y, z, worldX, worldZ);
+               if (solidCount < 4) {
+                  // It's a cave, carve out air.
+                  c->material = Material_Air;
+               }
+            }
+         }
+      }
+   }
+
+   // Generate Trees
+   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
+      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
+         // Find the height. Skip over anything that isn't the height.
+         // and we only care about grass.
+         S32 height = MAX_CHUNK_HEIGHT - 1;
+         for (; height >= 0; --height) {
+            if (getCubeAt(cubeData, x, height, z)->material != Material_Air) {
+               break;
+            }
+         }
+
+         if (getCubeAt(cubeData, x, height, z)->material == Material_Grass) {
+            // Lets generate some trees.
+            //
+            // Also, a tree only has a 1/10 chance of spawning on this block.
+            S32 posX = x;
+            S32 posZ = z;
+            if (open_simplex_noise2(osn, (F64)posX + worldX, (F64)posZ + worldZ) >= 0.8) {
+               getCubeAt(cubeData, x, height + 1, z)->material = Material_Wood_Trunk;
+               getCubeAt(cubeData, x, height + 2, z)->material = Material_Wood_Trunk;
+               getCubeAt(cubeData, x, height + 3, z)->material = Material_Wood_Trunk;
+               for (S32 xxx = x - 3; xxx < x + 3; ++xxx) {
+                  if (xxx >= CHUNK_WIDTH)
+                     break;
+                  else if (xxx < 0)
+                     continue;
+                  for (S32 zzz = z - 3; zzz < z + 3; ++zzz) {
+                     if (zzz >= CHUNK_WIDTH)
+                        break;
+                     else if (zzz < 0)
+                        continue;
+                     getCubeAt(cubeData, xxx, height + 4, zzz)->material = Material_Leaves;
+                  }
+               }
+            }
+         }
+      }
+   }
 }
 
 void generateGeometry(S32 chunkX, S32 chunkZ) {
@@ -286,11 +422,18 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
 
                S32 material = getCubeAt(cubeData, x, y, z)->material;
 
-               if (y == 0 || isTransparent(cubeData, x, y - 1, z))
-                  buildFace(chunk, i, CubeSides_Down, material, &localPos);
-
                if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
                   buildFace(chunk, i, CubeSides_Up, material, &localPos);
+
+               // If this is grass, bottom has to be dirt.
+
+               if (y == 0 || isTransparent(cubeData, x, y - 1, z))
+                  buildFace(chunk, i, CubeSides_Down, (material == Material_Grass ? Material_Dirt : material), &localPos);
+
+               // After we built the top, this is a special case for grass.
+               // If we are actually building grass sides it has to be special.
+               if (material == Material_Grass)
+                  material = Material_Grass_Side;
 
                if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
                   buildFace(chunk, i, CubeSides_West, material, &localPos);
@@ -354,9 +497,6 @@ void initWorld() {
 
    // Create shader
    generateShaderProgram("Shaders/basic.vert", "Shaders/basic.frag", &program);
-   // bind attrib locations
-   glBindAttribLocation(program, 0, "position");
-   glBindAttribLocation(program, 1, "uvs");
    projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
    modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
    textureLoc = glGetUniformLocation(program, "textureAtlas");
@@ -369,6 +509,7 @@ void initWorld() {
 
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
+//#pragma omp parallel for
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          // World position calcuation before passing.
@@ -378,8 +519,17 @@ void initWorld() {
 
    // TODO MULTITHREADED: sync here before generating the Geometry.
 
+   // Generate caves and tree
+//#pragma omp parallel for
+   for (S32 x = -worldSize; x < worldSize; ++x) {
+      for (S32 z = -worldSize; z < worldSize; ++z) {
+         generateCavesAndStructures(x, z, x * CHUNK_WIDTH, z * CHUNK_WIDTH);
+      }
+   }
+
    // Easilly put each chunk in a thread in here.
    // nothing OpenGL, all calculation and world generation.
+//#pragma omp parallel for
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          generateGeometry(x, z);

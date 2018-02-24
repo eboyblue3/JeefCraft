@@ -40,7 +40,7 @@ static bool loadShader(GLenum shaderType, const char *file, GLuint *shader) {
       return false;
 
    *shader = glCreateShader(shaderType);
-   glShaderSource(*shader, 1, &contents, NULL);
+   glShaderSource(*shader, 1, (const GLchar *const*)&contents, NULL);
    glCompileShader(*shader);
 
    // free contents of the file, we are done here as
@@ -82,6 +82,11 @@ bool generateShaderProgram(const char *vertexFile, const char *fragmentFile, U32
    *program = glCreateProgram();
    glAttachShader(*program, vertex);
    glAttachShader(*program, fragment);
+    
+   // bind attrib locations
+   glBindAttribLocation(*program, 0, "position");
+   glBindAttribLocation(*program, 1, "uvs");
+    
    glLinkProgram(*program);
 
    // Delete vertex/frag individual shaders as they are linked now.

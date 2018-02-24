@@ -12,12 +12,12 @@ uniform mat4 modelMatrix;
 
 void main() {
 	vec3 cNormals[6];
-	cNormals[0] = vec3(1,0,0);  // East
-	cNormals[1] = vec3(0,1,0);  // Up
-	cNormals[2] = vec3(-1,0,0); // West
-	cNormals[3] = vec3(0,-1,0); // Down
-	cNormals[4] = vec3(0,0,1);  // North
-	cNormals[5] = vec3(0,0,-1); // South
+	cNormals[0] = vec3(1.0,0.0,0.0);  // East
+	cNormals[1] = vec3(0.0,1.0,0.0);  // Up
+	cNormals[2] = vec3(-1.0,0.0,0.0); // West
+	cNormals[3] = vec3(0.0,-1.0,0.0); // Down
+	cNormals[4] = vec3(0.0,0.0,1.0);  // North
+	cNormals[5] = vec3(0.0,0.0,-1.0); // South
 
 	mat4 mvp = projViewMatrix * modelMatrix;
 	gl_Position = mvp * vec4(position.xyz, 1.0);
