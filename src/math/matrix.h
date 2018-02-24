@@ -31,4 +31,7 @@ void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, 
 
 void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up);
 
+/// Reference is based off of datenwolf's linmath library released under WTFPL 2.0
+void mat4_invert(mat4 *dest, mat4 *mat);
+
 #endif

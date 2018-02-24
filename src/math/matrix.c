@@ -9,7 +9,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// WIdest->mHOUdest->m WARRANdest->mIES OR CONDIdest->mIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //----------------------------------------------------------------------------
@@ -93,4 +93,45 @@ void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up) {
    dest->m[3].y = -vec_dot(&u, eye);
    dest->m[3].z = vec_dot(&f, eye);
    dest->m[3].w = 1.0f;
+}
+
+void mat4_invert(mat4 *dest, mat4 *mat) {
+   float s[6];
+   float c[6];
+
+   s[0] = mat->m[0].x * mat->m[1].y - mat->m[1].x * mat->m[0].y;
+   s[1] = mat->m[0].x * mat->m[1].z - mat->m[1].x * mat->m[0].z;
+   s[2] = mat->m[0].x * mat->m[1].w - mat->m[1].x * mat->m[0].w;
+   s[3] = mat->m[0].y * mat->m[1].z - mat->m[1].y * mat->m[0].z;
+   s[4] = mat->m[0].y * mat->m[1].w - mat->m[1].y * mat->m[0].w;
+   s[5] = mat->m[0].z * mat->m[1].w - mat->m[1].z * mat->m[0].w;
+
+   c[0] = mat->m[2].x * mat->m[3].y - mat->m[3].x * mat->m[2].y;
+   c[1] = mat->m[2].x * mat->m[3].z - mat->m[3].x * mat->m[2].z;
+   c[2] = mat->m[2].x * mat->m[3].w - mat->m[3].x * mat->m[2].w;
+   c[3] = mat->m[2].y * mat->m[3].z - mat->m[3].y * mat->m[2].z;
+   c[4] = mat->m[2].y * mat->m[3].w - mat->m[3].y * mat->m[2].w;
+   c[5] = mat->m[2].z * mat->m[3].w - mat->m[3].z * mat->m[2].w;
+
+   float idet = 1.0f / (s[0] * c[5] - s[1] * c[4] + s[2] * c[3] + s[3] * c[2] - s[4] * c[1] + s[5] * c[0]);
+
+   dest->m[0].x = (mat->m[1].y * c[5] - mat->m[1].z * c[4] + mat->m[1].w * c[3]) * idet;
+   dest->m[0].y = (-mat->m[0].y * c[5] + mat->m[0].z * c[4] - mat->m[0].w * c[3]) * idet;
+   dest->m[0].z = (mat->m[3].y * s[5] - mat->m[3].z * s[4] + mat->m[3].w * s[3]) * idet;
+   dest->m[0].w = (-mat->m[2].y * s[5] + mat->m[2].z * s[4] - mat->m[2].w * s[3]) * idet;
+
+   dest->m[1].x = (-mat->m[1].x * c[5] + mat->m[1].z * c[2] - mat->m[1].w * c[1]) * idet;
+   dest->m[1].y = (mat->m[0].x * c[5] - mat->m[0].z * c[2] + mat->m[0].w * c[1]) * idet;
+   dest->m[1].z = (-mat->m[3].x * s[5] + mat->m[3].z * s[2] - mat->m[3].w * s[1]) * idet;
+   dest->m[1].w = (mat->m[2].x * s[5] - mat->m[2].z * s[2] + mat->m[2].w * s[1]) * idet;
+
+   dest->m[2].x = (mat->m[1].x * c[4] - mat->m[1].y * c[2] + mat->m[1].w * c[0]) * idet;
+   dest->m[2].y = (-mat->m[0].x * c[4] + mat->m[0].y * c[2] - mat->m[0].w * c[0]) * idet;
+   dest->m[2].z = (mat->m[3].x * s[4] - mat->m[3].y * s[2] + mat->m[3].w * s[0]) * idet;
+   dest->m[2].w = (-mat->m[2].x * s[4] + mat->m[2].y * s[2] - mat->m[2].w * s[0]) * idet;
+
+   dest->m[3].x = (-mat->m[1].x * c[3] + mat->m[1].y * c[1] - mat->m[1].z * c[0]) * idet;
+   dest->m[3].y = (mat->m[0].x * c[3] - mat->m[0].y * c[1] + mat->m[0].z * c[0]) * idet;
+   dest->m[3].z = (-mat->m[3].x * s[3] + mat->m[3].y * s[1] - mat->m[3].z * s[0]) * idet;
+   dest->m[3].w = (mat->m[2].x * s[3] - mat->m[2].y * s[1] + mat->m[2].z * s[0]) * idet;
 }
