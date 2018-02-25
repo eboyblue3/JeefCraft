@@ -109,6 +109,11 @@ int main(int argc, char **argv) {
 
       // We completed a frame!
       fpsCounter++;
+
+      GLenum err = GL_NO_ERROR;
+      while ((err = glGetError()) != GL_NO_ERROR) {
+         printf("GL error: %d\n", err);
+      }
    }
    
    freeWorld();

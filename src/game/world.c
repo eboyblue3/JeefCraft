@@ -187,13 +187,8 @@ static inline bool isTransparentAtCube(Cube *c) {
 
 static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
    // first calculate chunk based upon position.
-   S32 chunkX = x / CHUNK_WIDTH;
-   S32 chunkZ = z / CHUNK_WIDTH;
-
-   if (x < 0)
-      --chunkX;
-   if (z < 0)
-      --chunkZ;
+   S32 chunkX = x < 0 ? ((x + 1) / CHUNK_WIDTH) - 1 : x / CHUNK_WIDTH;
+   S32 chunkZ = z < 0 ? ((z + 1) / CHUNK_WIDTH) - 1 : z / CHUNK_WIDTH;
 
    // Don't go past.
    if (chunkX < -worldSize || chunkX >= worldSize || chunkZ < -worldSize || chunkZ >= worldSize)
@@ -203,6 +198,11 @@ static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
 
    S32 localChunkX = x - (chunkX * CHUNK_WIDTH);
    S32 localChunkZ = z - (chunkZ * CHUNK_WIDTH);
+
+   assert(localChunkX >= 0);
+   assert(localChunkZ >= 0);
+   assert(localChunkX < CHUNK_WIDTH);
+   assert(localChunkZ < CHUNK_WIDTH);
 
    return getCubeAt(chunk->cubeData, localChunkX, y, localChunkZ);
 }

@@ -41,7 +41,7 @@ typedef union {
    };
 } Vec4;
 
-inline Vec3 create_vec3(F32 x, F32 y, F32 z) {
+static inline Vec3 create_vec3(F32 x, F32 y, F32 z) {
    Vec3 v;
    v.x = x;
    v.y = y;
