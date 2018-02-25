@@ -703,6 +703,12 @@ void renderWorld(F32 dt) {
          mat4 modelMatrix;
          glm_mat4_identity(modelMatrix);
          glm_translate(modelMatrix, pos.vec);
+
+         Vec3 scale = create_vec3(1.2f, 1.2f, 1.2f);
+         Vec3 trans = create_vec3(-0.1f, -0.1f, -0.1f);
+         glm_scale(modelMatrix, scale.vec);
+         glm_translate(modelMatrix, trans.vec);
+
          glUniformMatrix4fv(pickerShaderModelMatrixLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
 
          glBindBuffer(GL_ARRAY_BUFFER, singleBufferCubeVBO);
