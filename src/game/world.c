@@ -28,6 +28,8 @@
 #include "graphics/texture2d.h"
 #include "math/frustum.h"
 #include "platform/input.h"
+#include "math/screenWorld.h"
+#include "math/aabb.h"
 
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
@@ -116,7 +118,7 @@ typedef struct Chunk {
 Chunk *gChunkWorld = NULL;
 
 // Grid size but should be variable. This is the 'chunk distance'.
-S32 worldSize = 16;
+S32 worldSize = 2;
 
 Chunk* getChunkAt(S32 x, S32 z) {
    // Since x and z can go from -worldSize to worldSize,
@@ -452,6 +454,10 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
    }
 }
 
+
+GLuint singleBufferCubeVBO;
+GLuint singleBufferCubeIBO;
+
 void uploadGeometryToGL() {
    // *Single threaded*
    //
@@ -482,11 +488,37 @@ void uploadGeometryToGL() {
          }
       }
    }
+
+   // Single buffer cube vbo/ibo
+   glGenBuffers(1, &singleBufferCubeVBO);
+   glBindBuffer(GL_ARRAY_BUFFER, singleBufferCubeVBO);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(F32) * 6 * 4 * 4, cubes, GL_STATIC_DRAW);
+
+   glGenBuffers(1, &singleBufferCubeIBO);
+   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, singleBufferCubeIBO);
+   
+   S32 indices[36];
+   S32 in = 0;
+   for (S32 i = 0; i < 36; i += 6) {
+      indices[i] = in;
+      indices[i + 1] = in + 2;
+      indices[i + 2] = in + 1;
+      indices[i + 3] = in;
+      indices[i + 4] = in + 3;
+      indices[i + 5] = in + 2;
+
+      in += 4;
+   }
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(S32) * 36, indices, GL_STATIC_DRAW);
 }
 
 int gVisibleChunks = 0;
 int gTotalVisibleChunks = 0;
 int gTotalChunks = 0;
+
+S32 pickerShaderProjMatrixLoc;
+S32 pickerShaderModelMatrixLoc;
+GLuint pickerProgram;
 
 void initWorld() {
    // Only 2 mip levels.
@@ -500,6 +532,11 @@ void initWorld() {
    projMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
    modelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
    textureLoc = glGetUniformLocation(program, "textureAtlas");
+
+   // Create shader for picker
+   generateShaderProgram("Shaders/red.vert", "Shaders/red.frag", &pickerProgram);
+   pickerShaderProjMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
+   pickerShaderModelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
 
    open_simplex_noise((U64)0xDEADBEEF, &osn);
 
@@ -604,6 +641,9 @@ void renderWorld(F32 dt) {
    Frustum frustum;
    getCameraFrustum(&frustum);
 
+   vec cameraPos;
+   getCameraPosition(&cameraPos);
+
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
@@ -620,7 +660,6 @@ void renderWorld(F32 dt) {
                vec_add(&center, &pos, &halfExtents);
                center.y += (F32)(i * RENDER_CHUNK_HEIGHT); // We add since we already have RENDER_CHUNK_HEIGHT / 2.0
 
-               // TODO: test frustrum culling
                if (FrustumCullSquareBox(&frustum, &center, CHUNK_WIDTH / 2.0f)) {
                   mat4 modelMatrix;
                   mat4_identity(&modelMatrix);
@@ -633,11 +672,47 @@ void renderWorld(F32 dt) {
                   glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
                   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
                   glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
+                  glDisableVertexAttribArray(0);
+                  glDisableVertexAttribArray(1);
 
                   gVisibleChunks++;
                }
             }
          }
+      }
+   }
+
+   // Do our raycast to screen world.
+   vec rayOrigin, rayDir;
+   raycastScreenToWorld(1400.0f / 2.0f, 900.0f / 2.0f, 1400.0f, 900.0f, &projView, &rayOrigin, &rayDir);
+
+   // Check to see if we have something within 8 blocks away.
+   vec point = rayOrigin;
+   vec scalar;
+   vec_scale(&scalar, &rayDir, 0.1f);
+   for (S32 i = 0; i < 80; ++i) {
+      vec_addeq(&point, &scalar);
+
+      vec pos = vec3(roundf(point.x), roundf(point.y), roundf(point.z));
+
+      // Calculate chunk at point.
+      Cube *c = getGlobalCubeAtWorldSpacePosition((S32)pos.x, (S32)pos.y, (S32)pos.z);
+      if (c->material != Material_Air) {
+         glUseProgram(pickerProgram);
+
+         glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
+         mat4 modelMatrix;
+         mat4_identity(&modelMatrix);
+         mat4_setPosition(&modelMatrix, &pos);
+         glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
+
+         glBindBuffer(GL_ARRAY_BUFFER, singleBufferCubeVBO);
+         glEnableVertexAttribArray(0);
+         glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(F32) * 4, (void*)0);
+         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, singleBufferCubeIBO);
+         glDrawElements(GL_TRIANGLES, (GLsizei)36, GL_UNSIGNED_INT, (void*)0);
+         glDisableVertexAttribArray(0);
+         break;
       }
    }
 }

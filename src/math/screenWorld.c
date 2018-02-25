@@ -17,7 +17,7 @@
 #include "math/screenWorld.h"
 #include "math/matrix.h"
 
-void raycastScreenToWorld(S32 mouseX, S32 mouseY, S32 width, S32 height, mat4 *mvp, vec *rayOrigin, vec *rayDir) {
+void raycastScreenToWorld(F32 mouseX, F32 mouseY, F32 width, F32 height, mat4 *vp, vec *rayOrigin, vec *rayDir) {
    // Normalize the rayStart and rayEnd -1.0 to 1.0
    vec4 rayStart;
    rayStart.x = (mouseX / width - 0.5f) * 2.0f;
@@ -26,13 +26,13 @@ void raycastScreenToWorld(S32 mouseX, S32 mouseY, S32 width, S32 height, mat4 *m
    rayStart.w = 1.0f;
 
    vec4 rayEnd;
-   rayStart.x = (mouseX / width - 0.5f) * 2.0f;
-   rayStart.y = (mouseY / height - 0.5f) * 2.0f;
-   rayStart.z = 0.0f;
-   rayStart.w = 1.0f;
+   rayEnd.x = (mouseX / width - 0.5f) * 2.0f;
+   rayEnd.y = (mouseY / height - 0.5f) * 2.0f;
+   rayEnd.z = 0.0f;
+   rayEnd.w = 1.0f;
 
    mat4 invert;
-   mat4_invert(&invert, mvp);
+   mat4_invert(&invert, vp);
 
    vec4 rayWorldStart, rayWorldEnd;
    mat4_mul_vec4(&rayWorldStart, &invert, &rayStart);

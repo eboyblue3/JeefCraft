@@ -137,8 +137,8 @@ void mat4_invert(mat4 *dest, mat4 *mat) {
 }
 
 void mat4_mul_vec4(vec4 *dest, mat4 *mat, vec4 *vec) {
-   dest->x = mat->m[0].x * vec->x + mat->m[0].y * vec->y + mat->m[0].z * vec->z + mat->m[0].w * vec->w;
-   dest->y = mat->m[1].x * vec->x + mat->m[1].y * vec->y + mat->m[1].z * vec->z + mat->m[1].w * vec->w;
-   dest->z = mat->m[2].x * vec->x + mat->m[2].y * vec->y + mat->m[2].z * vec->z + mat->m[2].w * vec->w;
-   dest->w = mat->m[3].x * vec->x + mat->m[3].y * vec->y + mat->m[3].z * vec->z + mat->m[3].w * vec->w;
+   dest->x = mat->m[0].x * vec->x + mat->m[1].x * vec->y + mat->m[2].x * vec->z + mat->m[3].x * vec->w;
+   dest->y = mat->m[0].y * vec->x + mat->m[1].y * vec->y + mat->m[2].y * vec->z + mat->m[3].y * vec->w;
+   dest->z = mat->m[0].z * vec->x + mat->m[1].z * vec->y + mat->m[2].z * vec->z + mat->m[3].z * vec->w;
+   dest->w = mat->m[0].w * vec->x + mat->m[1].w * vec->y + mat->m[2].w * vec->z + mat->m[3].w * vec->w;
 }
