@@ -499,7 +499,7 @@ void uploadGeometryToGL() {
    glGenBuffers(1, &singleBufferCubeIBO);
    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, singleBufferCubeIBO);
    
-   S32 indices[36];
+   GPUIndex indices[36];
    S32 in = 0;
    for (S32 i = 0; i < 36; i += 6) {
       indices[i] = in;
@@ -511,7 +511,7 @@ void uploadGeometryToGL() {
 
       in += 4;
    }
-   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(S32) * 36, indices, GL_STATIC_DRAW);
+   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * 36, indices, GL_STATIC_DRAW);
 }
 
 int gVisibleChunks = 0;
@@ -537,8 +537,8 @@ void initWorld() {
 
    // Create shader for picker
    generateShaderProgram("Shaders/red.vert", "Shaders/red.frag", &pickerProgram);
-   pickerShaderProjMatrixLoc = glGetUniformLocation(program, "projViewMatrix");
-   pickerShaderModelMatrixLoc = glGetUniformLocation(program, "modelMatrix");
+   pickerShaderProjMatrixLoc = glGetUniformLocation(pickerProgram, "projViewMatrix");
+   pickerShaderModelMatrixLoc = glGetUniformLocation(pickerProgram, "modelMatrix");
 
    open_simplex_noise((U64)0xDEADBEEF, &osn);
 
