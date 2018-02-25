@@ -682,21 +682,29 @@ void renderWorld(F32 dt) {
    }
 
    // Do our raycast to screen world.
-   Vec3 rayOrigin, rayDir;
-   raycastScreenToWorld(1400.0f / 2.0f, 900.0f / 2.0f, 1400.0f, 900.0f, projView, &rayOrigin, &rayDir);
+   Vec3 rayOrigin;
+   getCameraPosition(&rayOrigin);
+
+   Vec4 forward = {{0, 0, -1, 0}};
+   Vec4 rayDir;
+
+   mat4 inverse_view;
+   glm_mat4_inv(view, inverse_view);
+
+   glm_mat4_mulv(inverse_view, forward.vec, rayDir.vec);
 
    // Check to see if we have something within 8 blocks away.
    Vec3 point = rayOrigin;
    Vec3 scalar;
-   glm_vec_scale(rayDir.vec, 0.1f, scalar.vec);
+   glm_vec_scale(rayDir.vec, 0.01f, scalar.vec);
    for (S32 i = 0; i < 800; ++i) {
       glm_vec_add(point.vec, scalar.vec, point.vec);
 
-      Vec3 pos = create_vec3(roundf(point.x), roundf(point.y), roundf(point.z));
+      Vec3 pos = create_vec3(floorf(point.x), floorf(point.y), floorf(point.z));
 
       // Calculate chunk at point.
       Cube *c = getGlobalCubeAtWorldSpacePosition((S32)pos.x, (S32)pos.y, (S32)pos.z);
-      if (c->material != Material_Air) {
+      if (c != NULL && c->material != Material_Air) {
          glUseProgram(pickerProgram);
 
          glUniformMatrix4fv(pickerShaderProjMatrixLoc, 1, GL_FALSE, &(projView[0][0]));
