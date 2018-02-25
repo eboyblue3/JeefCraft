@@ -19,12 +19,21 @@
 #define min(a, b) (((a) < (b)) ? (a) : (b))
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 
+void aabbFromCenterPoint(AABB *dest, vec *center, F32 radius) {
+   dest->min.x = center->x - radius;
+   dest->min.y = center->y - radius;
+   dest->min.z = center->z - radius;
+   dest->max.x = center->x + radius;
+   dest->max.y = center->y + radius;
+   dest->max.z = center->z + radius;
+}
+
 /// @Reference gamedev stack exchange by zacharmarz
 /// https://gamedev.stackexchange.com/a/18459
 bool rayAABBTest(vec *rayDir, vec *rayOrigin, AABB *aabb) {
    vec inverseDir = vec3(1.0f / rayDir->x, 1.0f / rayDir->y, 1.0f / rayDir->z);
 
-   float test[6];
+   F32 test[6];
 
    // Min
    test[0] = (aabb->min.x - rayOrigin->x) * inverseDir.x;
@@ -36,16 +45,12 @@ bool rayAABBTest(vec *rayDir, vec *rayOrigin, AABB *aabb) {
    test[4] = (aabb->max.y - rayOrigin->y) * inverseDir.y;
    test[5] = (aabb->max.z - rayOrigin->z) * inverseDir.z;
 
-   // Try min
-   float minimum = max(max(min(test[0], test[3]), min(test[1], test[4])), min(test[2], test[5]));
-   if (minimum < 0.0f)
+   F32 minimum = max(max(min(test[0], test[3]), min(test[1], test[4])), min(test[2], test[5]));
+   F32 maximum = min(min(max(test[0], test[3]), max(test[1], test[4])), max(test[2], test[5]));
+   
+   if (maximum < 0.0f || minimum > maximum)
       return false;
-
-   // Try max.
-   float maximum = min(min(max(test[0], test[3]), max(test[1], test[4])), max(test[2], test[5]));
-   if (minimum > maximum)
-      return false;
-
+   printf("Minimum: %f\n", minimum);
    // Passed.
    return true;
 }
