@@ -70,9 +70,7 @@ set(JEEFCRAFT_SRC
 	src/math/aabb.h
 	src/math/frustum.c
 	src/math/frustum.h
-	src/math/math_impl.c
-	src/math/matrix.c
-	src/math/matrix.h
+	src/math/math.h
 	src/math/screenWorld.c
 	src/math/screenWorld.h
 
@@ -111,9 +109,12 @@ target_include_directories(${EXECUTABLE_NAME}
 	PUBLIC ${OPENGL_INCLUDE_DIR}
 	PUBLIC "${THIRDPARTY_DIR}/glfw3/include"
 	PUBLIC "${THIRDPARTY_DIR}/stb"
-	PUBLIC "${THIRDPARTY_DIR}/opensimplexnoise/"
+	PUBLIC "${THIRDPARTY_DIR}/opensimplexnoise"
+	PUBLIC "${THIRDPARTY_DIR}/cglm/include"
 	PUBLIC src
 )
+
+target_compile_definitions(${EXECUTABLE_NAME} PUBLIC RAYMATH_STANDALONE)
 
 source_group("base" REGULAR_EXPRESSION src/base/*)
 source_group("game" REGULAR_EXPRESSION src/game/*)

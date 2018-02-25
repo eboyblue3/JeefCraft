@@ -17,8 +17,7 @@
 #ifndef _MATH_FRUSTUM_H_
 #define _MATH_FRUSTUM_H_
 
-#include <stb_vec.h>
-#include "base/types.h"
+#include "math/math.h"
 
 typedef struct FrustumPlane {
    F32 x;
@@ -42,8 +41,8 @@ typedef struct Frustum {
    FrustumPlane planes[FRUSTUM_LOOP_COUNT];
 } Frustum;
 
-void computeFrustum(mat4 *mvp, Frustum *frustum);
+void computeFrustum(mat4 mvp, Frustum *frustum);
 
-bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent);
+bool FrustumCullSquareBox(Frustum *frustum, Vec3 center, float halfExtent);
 
 #endif

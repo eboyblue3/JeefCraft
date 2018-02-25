@@ -17,16 +17,15 @@
 #ifndef _MATH_AABB_H_
 #define _MATH_AABB_H_
 
-#include "base/types.h"
-#include <stb_vec.h>
+#include "math/math.h"
 
 typedef struct {
-   vec min;
-   vec max;
+   Vec3 min;
+   Vec3 max;
 } AABB;
 
-void aabbFromCenterPoint(AABB *dest, vec *center, F32 radius);
+void aabbFromCenterPoint(AABB *dest, Vec3 center, F32 radius);
 
-bool rayAABBTest(vec *rayDir, vec *rayOrigin, AABB *aabb);
+bool rayAABBTest(Vec3 rayDir, Vec3 rayOrigin, AABB *aabb);
 
 #endif

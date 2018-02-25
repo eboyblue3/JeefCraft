@@ -18,11 +18,9 @@
 #include <assert.h>
 #include <string.h>
 #include <GL/glew.h>
-#include <stb_vec.h>
 #include <stretchy_buffer.h>
 #include <open-simplex-noise.h>
 #include "game/world.h"
-#include "math/matrix.h"
 #include "game/camera.h"
 #include "graphics/shader.h"
 #include "graphics/texture2d.h"
@@ -68,8 +66,9 @@ typedef enum CubeSides {
 static struct osn_context *osn;
 
 typedef struct GPUVertex {
-   vec4 position;
-   vec2 uvs;
+   Vec4 position;
+   F32 uvx;
+   F32 uvy;
 } GPUVertex;
 
 typedef U32 GPUIndex;
@@ -143,19 +142,19 @@ Cube* getCubeAt(Cube *cubeData, S32 x, S32 y, S32 z) {
 #define TEXTURE_ATLAS_COUNT_I 32
 #define TEXTURE_ATLAS_COUNT_F 32.0f
 
-void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, vec *localPos) {
+void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, Vec3 localPos) {
    // Vertex data first, then index data.
 
    RenderChunk *renderChunk = &chunk->renderChunks[index];
 
    for (S32 i = 0; i < 4; ++i) {
       GPUVertex v;
-      v.position.x = cubes[side][i][0] + localPos->x;
-      v.position.y = cubes[side][i][1] + localPos->y;
-      v.position.z = cubes[side][i][2] + localPos->z;
+      v.position.x = cubes[side][i][0] + localPos.x;
+      v.position.y = cubes[side][i][1] + localPos.y;
+      v.position.z = cubes[side][i][2] + localPos.z;
       v.position.w = cubes[side][i][3];
-      v.uvs.x = (F32)(cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
-      v.uvs.y = (F32)(cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvx = (F32)(cubeUVs[side][i][0] + ((F32)(material % TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
+      v.uvy = (F32)(cubeUVs[side][i][1] + ((F32)(material / TEXTURE_ATLAS_COUNT_I))) / TEXTURE_ATLAS_COUNT_F;
       sb_push(renderChunk->vertexData, v);
    }
    renderChunk->vertexCount += 4;
@@ -372,7 +371,10 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
          for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
             for (S32 j = 0; j < RENDER_CHUNK_HEIGHT; ++j) {
                S32 y = (RENDER_CHUNK_HEIGHT * i) + j;
-               vec localPos = vec3(x, y, z);
+               Vec3 localPos;
+               localPos.x = (F32)x;
+               localPos.y = (F32)y;
+               localPos.z = (F32)z;
 
                // skip if current block is transparent.
                if (isTransparent(cubeData, x, y, z))
@@ -425,12 +427,12 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                S32 material = getCubeAt(cubeData, x, y, z)->material;
 
                if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
-                  buildFace(chunk, i, CubeSides_Up, material, &localPos);
+                  buildFace(chunk, i, CubeSides_Up, material, localPos);
 
                // If this is grass, bottom has to be dirt.
 
                if (y == 0 || isTransparent(cubeData, x, y - 1, z))
-                  buildFace(chunk, i, CubeSides_Down, (material == Material_Grass ? Material_Dirt : material), &localPos);
+                  buildFace(chunk, i, CubeSides_Down, (material == Material_Grass ? Material_Dirt : material), localPos);
 
                // After we built the top, this is a special case for grass.
                // If we are actually building grass sides it has to be special.
@@ -438,16 +440,16 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
                   material = Material_Grass_Side;
 
                if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
-                  buildFace(chunk, i, CubeSides_West, material, &localPos);
+                  buildFace(chunk, i, CubeSides_West, material, localPos);
 
                if ((!isOpaquePositiveX && x >= (CHUNK_WIDTH - 1)) || (x < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x + 1, y, z)))
-                  buildFace(chunk, i, CubeSides_East, material, &localPos);
+                  buildFace(chunk, i, CubeSides_East, material, localPos);
 
                if ((!isOpaqueNegativeZ && z == 0) || (z > 0 && isTransparent(cubeData, x, y, z - 1)))
-                  buildFace(chunk, i, CubeSides_South, material, &localPos);
+                  buildFace(chunk, i, CubeSides_South, material, localPos);
 
                if ((!isOpaquePositiveZ && z >= (CHUNK_WIDTH - 1)) || (z < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x, y, z + 1)))
-                  buildFace(chunk, i, CubeSides_North, material, &localPos);
+                  buildFace(chunk, i, CubeSides_North, material, localPos);
             }
          }
       }
@@ -621,14 +623,14 @@ void renderWorld(F32 dt) {
       getCurrentProjMatrix(&proj);
       getCurrentViewMatrix(&view);
    } else {
-      mat4_ortho(&proj, -256.0f, 256.0f, -256.0f / (1440.f / 900.f), 256.0f / (1440.f / 900.f), -200.0f, 200.0f);
-      vec eye = vec3(0.0f, 0.0f, 0.0f);
-      vec center = vec3(0.0f, -1.0f, 0.0f);
-      vec up = vec3(1.0f, 0.0f, 0.0f);
-      mat4_lookAt(&view, &eye, &center, &up);
+      glm_ortho(-256.0f, 256.0f, -256.0f / (1440.f / 900.f), 256.0f / (1440.f / 900.f), -200.0f, 200.0f, proj);
+      Vec3 eye = create_vec3(0.0f, 0.0f, 0.0f);
+      Vec3 center = create_vec3(0.0f, -1.0f, 0.0f);
+      Vec3 up = create_vec3(1.0f, 0.0f, 0.0f);
+      glm_lookat(eye.vec, center.vec, up.vec, view);
    }
-   mat4_mul(&projView, &proj, &view);
-   glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
+   glm_mat4_mul(proj, view, projView);
+   glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView[0][0]));
 
    // Bind our texture atlas to texture unit 0
    glActiveTexture(GL_TEXTURE0);
@@ -641,9 +643,6 @@ void renderWorld(F32 dt) {
    Frustum frustum;
    getCameraFrustum(&frustum);
 
-   vec cameraPos;
-   getCameraPosition(&cameraPos);
-
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
@@ -654,22 +653,22 @@ void renderWorld(F32 dt) {
                // Set position.
                // Center y pos should actually be RENDER_CHUNK_HEIGHT * i
                // but pos should always be 0 for y since the pos is baked into the y coord.
-               vec pos = vec3(x * CHUNK_WIDTH, 0, z * CHUNK_WIDTH);
-               vec center;
-               vec halfExtents = vec3(CHUNK_WIDTH / 2.0f, RENDER_CHUNK_HEIGHT / 2.0f, CHUNK_WIDTH / 2.0f);
-               vec_add(&center, &pos, &halfExtents);
+               Vec3 pos = create_vec3(x * CHUNK_WIDTH, 0, z * CHUNK_WIDTH);
+               Vec3 center;
+               Vec3 halfExtents = create_vec3(CHUNK_WIDTH / 2.0f, RENDER_CHUNK_HEIGHT / 2.0f, CHUNK_WIDTH / 2.0f);
+               glm_vec_add(pos.vec, halfExtents.vec, center.vec);
                center.y += (F32)(i * RENDER_CHUNK_HEIGHT); // We add since we already have RENDER_CHUNK_HEIGHT / 2.0
 
-               if (FrustumCullSquareBox(&frustum, &center, CHUNK_WIDTH / 2.0f)) {
+               if (FrustumCullSquareBox(&frustum, center, CHUNK_WIDTH / 2.0f)) {
                   mat4 modelMatrix;
-                  mat4_identity(&modelMatrix);
-                  mat4_setPosition(&modelMatrix, &pos);
-                  glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
+                  glm_mat4_identity(modelMatrix);
+                  glm_translate(modelMatrix, pos.vec);
+                  glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
                   glBindBuffer(GL_ARRAY_BUFFER, c->renderChunks[i].vbo);
                   glEnableVertexAttribArray(0);
                   glEnableVertexAttribArray(1);
                   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, position));
-                  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvs));
+                  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(GPUVertex), (void*)offsetof(GPUVertex, uvx));
                   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, c->renderChunks[i].ibo);
                   glDrawElements(GL_TRIANGLES, (GLsizei)c->renderChunks[i].indiceCount, GL_UNSIGNED_INT, (void*)0);
                   glDisableVertexAttribArray(0);
@@ -683,28 +682,28 @@ void renderWorld(F32 dt) {
    }
 
    // Do our raycast to screen world.
-   vec rayOrigin, rayDir;
-   raycastScreenToWorld(1400.0f / 2.0f, 900.0f / 2.0f, 1400.0f, 900.0f, &projView, &rayOrigin, &rayDir);
+   Vec3 rayOrigin, rayDir;
+   raycastScreenToWorld(1400.0f / 2.0f, 900.0f / 2.0f, 1400.0f, 900.0f, projView, &rayOrigin, &rayDir);
 
    // Check to see if we have something within 8 blocks away.
-   vec point = rayOrigin;
-   vec scalar;
-   vec_scale(&scalar, &rayDir, 0.1f);
-   for (S32 i = 0; i < 80; ++i) {
-      vec_addeq(&point, &scalar);
+   Vec3 point = rayOrigin;
+   Vec3 scalar;
+   glm_vec_scale(rayDir.vec, 0.1f, scalar.vec);
+   for (S32 i = 0; i < 800; ++i) {
+      glm_vec_add(point.vec, scalar.vec, point.vec);
 
-      vec pos = vec3(roundf(point.x), roundf(point.y), roundf(point.z));
+      Vec3 pos = create_vec3(roundf(point.x), roundf(point.y), roundf(point.z));
 
       // Calculate chunk at point.
       Cube *c = getGlobalCubeAtWorldSpacePosition((S32)pos.x, (S32)pos.y, (S32)pos.z);
       if (c->material != Material_Air) {
          glUseProgram(pickerProgram);
 
-         glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView.m[0].x));
+         glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView[0][0]));
          mat4 modelMatrix;
-         mat4_identity(&modelMatrix);
-         mat4_setPosition(&modelMatrix, &pos);
-         glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix.m[0].x));
+         glm_mat4_identity(modelMatrix);
+         glm_translate(modelMatrix, pos.vec);
+         glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
 
          glBindBuffer(GL_ARRAY_BUFFER, singleBufferCubeVBO);
          glEnableVertexAttribArray(0);

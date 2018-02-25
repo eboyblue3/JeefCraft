@@ -23,36 +23,36 @@
 //
 // Note: This code assumes OpenGL model for now. If "D3D space" is needed, we will
 // need to implement it. Note that element access to the combo matrix is in column major order.
-void computeFrustum(mat4 *mvp, Frustum *frustum) {
-   frustum->planes[FRUSTUM_LEFT].x = mvp->m[0].w + mvp->m[0].x;
-   frustum->planes[FRUSTUM_LEFT].y = mvp->m[1].w + mvp->m[1].x;
-   frustum->planes[FRUSTUM_LEFT].z = mvp->m[2].w + mvp->m[2].x;
-   frustum->planes[FRUSTUM_LEFT].n = mvp->m[3].w + mvp->m[3].x;
+void computeFrustum(mat4 mvp, Frustum *frustum) {
+   frustum->planes[FRUSTUM_LEFT].x = mvp[0][3] + mvp[0][0];
+   frustum->planes[FRUSTUM_LEFT].y = mvp[1][3] + mvp[1][0];
+   frustum->planes[FRUSTUM_LEFT].z = mvp[2][3] + mvp[2][0];
+   frustum->planes[FRUSTUM_LEFT].n = mvp[3][3] + mvp[3][0];
 
-   frustum->planes[FRUSTUM_RIGHT].x = mvp->m[0].w - mvp->m[0].x;
-   frustum->planes[FRUSTUM_RIGHT].y = mvp->m[1].w - mvp->m[1].x;
-   frustum->planes[FRUSTUM_RIGHT].z = mvp->m[2].w - mvp->m[2].x;
-   frustum->planes[FRUSTUM_RIGHT].n = mvp->m[3].w - mvp->m[3].x;
+   frustum->planes[FRUSTUM_RIGHT].x = mvp[0][3] - mvp[0][0];
+   frustum->planes[FRUSTUM_RIGHT].y = mvp[1][3] - mvp[1][0];
+   frustum->planes[FRUSTUM_RIGHT].z = mvp[2][3] - mvp[2][0];
+   frustum->planes[FRUSTUM_RIGHT].n = mvp[3][3] - mvp[3][0];
 
-   frustum->planes[FRUSTUM_TOP].x = mvp->m[0].w - mvp->m[0].y;
-   frustum->planes[FRUSTUM_TOP].y = mvp->m[1].w - mvp->m[1].y;
-   frustum->planes[FRUSTUM_TOP].z = mvp->m[2].w - mvp->m[2].y;
-   frustum->planes[FRUSTUM_TOP].n = mvp->m[3].w - mvp->m[3].y;
+   frustum->planes[FRUSTUM_TOP].x = mvp[0][3] - mvp[0][1];
+   frustum->planes[FRUSTUM_TOP].y = mvp[1][3] - mvp[1][1];
+   frustum->planes[FRUSTUM_TOP].z = mvp[2][3] - mvp[2][1];
+   frustum->planes[FRUSTUM_TOP].n = mvp[3][3] - mvp[3][1];
 
-   frustum->planes[FRUSTUM_BOTTOM].x = mvp->m[0].w + mvp->m[0].y;
-   frustum->planes[FRUSTUM_BOTTOM].y = mvp->m[1].w + mvp->m[1].y;
-   frustum->planes[FRUSTUM_BOTTOM].z = mvp->m[2].w + mvp->m[2].y;
-   frustum->planes[FRUSTUM_BOTTOM].n = mvp->m[3].w + mvp->m[3].y;
+   frustum->planes[FRUSTUM_BOTTOM].x = mvp[0][3] + mvp[0][1];
+   frustum->planes[FRUSTUM_BOTTOM].y = mvp[1][3] + mvp[1][1];
+   frustum->planes[FRUSTUM_BOTTOM].z = mvp[2][3] + mvp[2][1];
+   frustum->planes[FRUSTUM_BOTTOM].n = mvp[3][3] + mvp[3][1];
 
-   frustum->planes[FRUSTUM_NEAR].x = mvp->m[0].w + mvp->m[0].z;
-   frustum->planes[FRUSTUM_NEAR].y = mvp->m[1].w + mvp->m[1].z;
-   frustum->planes[FRUSTUM_NEAR].z = mvp->m[2].w + mvp->m[2].z;
-   frustum->planes[FRUSTUM_NEAR].n = mvp->m[3].w + mvp->m[3].z;
+   frustum->planes[FRUSTUM_NEAR].x = mvp[0][3] + mvp[0][2];
+   frustum->planes[FRUSTUM_NEAR].y = mvp[1][3] + mvp[1][2];
+   frustum->planes[FRUSTUM_NEAR].z = mvp[2][3] + mvp[2][2];
+   frustum->planes[FRUSTUM_NEAR].n = mvp[3][3] + mvp[3][2];
 
-   frustum->planes[FRUSTUM_FAR].x = mvp->m[0].w - mvp->m[0].z;
-   frustum->planes[FRUSTUM_FAR].y = mvp->m[1].w - mvp->m[1].z;
-   frustum->planes[FRUSTUM_FAR].z = mvp->m[2].w - mvp->m[2].z;
-   frustum->planes[FRUSTUM_FAR].n = mvp->m[3].w - mvp->m[3].z;
+   frustum->planes[FRUSTUM_FAR].x = mvp[0][3] - mvp[0][2];
+   frustum->planes[FRUSTUM_FAR].y = mvp[1][3] - mvp[1][2];
+   frustum->planes[FRUSTUM_FAR].z = mvp[2][3] - mvp[2][2];
+   frustum->planes[FRUSTUM_FAR].n = mvp[3][3] - mvp[3][2];
 
    // Normalize.
    for (S32 i = 0; i < FRUSTUM_LOOP_COUNT; ++i) {
@@ -70,8 +70,8 @@ void computeFrustum(mat4 *mvp, Frustum *frustum) {
 //
 // Copyright (c) 2000-2014 Torus Knot Software Ltd
 // License: MIT
-static inline float planeDistance(vec *vert, FrustumPlane *plane) {
-   return plane->x * vert->x + plane->y * vert->y + plane->z * vert->z + plane->n;
+static inline float planeDistance(Vec3 vert, FrustumPlane *plane) {
+   return plane->x * vert.x + plane->y * vert.y + plane->z * vert.z + plane->n;
 }
 
 // Culls square box in world-space
@@ -79,7 +79,7 @@ static inline float planeDistance(vec *vert, FrustumPlane *plane) {
 //
 // Copyright (c) 2000-2014 Torus Knot Software Ltd
 // License: MIT
-bool FrustumCullSquareBox(Frustum *frustum, vec *center, float halfExtent) {
+bool FrustumCullSquareBox(Frustum *frustum, Vec3 center, float halfExtent) {
    for (S32 i = 0; i < FRUSTUM_LOOP_COUNT; ++i) {
       FrustumPlane *plane = &frustum->planes[i];
 

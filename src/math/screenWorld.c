@@ -15,32 +15,34 @@
 //----------------------------------------------------------------------------
 
 #include "math/screenWorld.h"
-#include "math/matrix.h"
 
-void raycastScreenToWorld(F32 mouseX, F32 mouseY, F32 width, F32 height, mat4 *vp, vec *rayOrigin, vec *rayDir) {
+void raycastScreenToWorld(F32 mouseX, F32 mouseY, F32 width, F32 height, mat4 vp, Vec3 *rayOrigin, Vec3 *rayDir) {
    // Normalize the rayStart and rayEnd -1.0 to 1.0
-   vec4 rayStart;
+   Vec4 rayStart;
    rayStart.x = (mouseX / width - 0.5f) * 2.0f;
    rayStart.y = (mouseY / height - 0.5f) * 2.0f;
    rayStart.z = -1.0f;
    rayStart.w = 1.0f;
 
-   vec4 rayEnd;
+   Vec4 rayEnd;
    rayEnd.x = (mouseX / width - 0.5f) * 2.0f;
    rayEnd.y = (mouseY / height - 0.5f) * 2.0f;
    rayEnd.z = 0.0f;
    rayEnd.w = 1.0f;
 
    mat4 invert;
-   mat4_invert(&invert, vp);
+   glm_mat4_inv(vp, invert);
 
-   vec4 rayWorldStart, rayWorldEnd;
-   mat4_mul_vec4(&rayWorldStart, &invert, &rayStart);
-   mat4_mul_vec4(&rayWorldEnd, &invert, &rayEnd);
-   vec rwStart = vec3(rayWorldStart.x, rayWorldStart.y, rayWorldStart.z);
-   vec rwEnd = vec3(rayWorldEnd.x, rayWorldEnd.y, rayWorldEnd.z);
-   vec_scaleeq(&rwStart, 1.0f / rayWorldStart.w);
-   vec_scaleeq(&rwEnd, 1.0f / rayWorldEnd.w);
+   Vec4 rayWorldStart, rayWorldEnd;
+   glm_mat4_mulv(invert, rayStart.vec, rayWorldStart.vec);
+   glm_mat4_mulv(invert, rayEnd.vec, rayWorldEnd.vec);
+
+   Vec3 rwStart, rwEnd;
+   glm_vec3(rayWorldStart.vec, rwStart.vec);
+   glm_vec3(rayWorldEnd.vec, rwEnd.vec);
+
+   glm_vec_scale(rwStart.vec, 1.0f / rayWorldStart.w, rwStart.vec);
+   glm_vec_scale(rwEnd.vec, 1.0f / rayWorldEnd.w, rwEnd.vec);
 
    // Output
    rayOrigin->x = rwStart.x;
@@ -48,7 +50,6 @@ void raycastScreenToWorld(F32 mouseX, F32 mouseY, F32 width, F32 height, mat4 *v
    rayOrigin->z = rwStart.z;
 
    // Output
-   vec rayDirWorld;
-   vec_sub(&rayDirWorld, &rwStart, &rwEnd);
-   vec_norm(rayDir, &rayDirWorld);
+   glm_vec_sub(rwStart.vec, rwEnd.vec, rayDir->vec);
+   glm_vec_norm(rayDir->vec);
 }
