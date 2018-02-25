@@ -699,11 +699,11 @@ void renderWorld(F32 dt) {
       if (c->material != Material_Air) {
          glUseProgram(pickerProgram);
 
-         glUniformMatrix4fv(projMatrixLoc, 1, GL_FALSE, &(projView[0][0]));
+         glUniformMatrix4fv(pickerShaderProjMatrixLoc, 1, GL_FALSE, &(projView[0][0]));
          mat4 modelMatrix;
          glm_mat4_identity(modelMatrix);
          glm_translate(modelMatrix, pos.vec);
-         glUniformMatrix4fv(modelMatrixLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
+         glUniformMatrix4fv(pickerShaderModelMatrixLoc, 1, GL_FALSE, &(modelMatrix[0][0]));
 
          glBindBuffer(GL_ARRAY_BUFFER, singleBufferCubeVBO);
          glEnableVertexAttribArray(0);
