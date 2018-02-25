@@ -66,11 +66,15 @@ set(JEEFCRAFT_SRC
 
 	src/main/main.c
 
+	src/math/aabb.c
+	src/math/aabb.h
 	src/math/frustum.c
 	src/math/frustum.h
 	src/math/math_impl.c
 	src/math/matrix.c
 	src/math/matrix.h
+	src/math/screenWorld.c
+	src/math/screenWorld.h
 
 	src/platform/input.h
 	src/platform/platform.h

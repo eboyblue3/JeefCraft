@@ -14,26 +14,16 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _MATH_MATRIX_H_
-#define _MATH_MATRIX_H_
+#ifndef _MATH_AABB_H_
+#define _MATH_AABB_H_
 
-#include <math.h>
 #include <stb_vec.h>
-#include "base/types.h"
 
-void mat4_getPosition(vec *dest, mat4 *src);
+typedef struct {
+   vec min;
+   vec max;
+} AABB;
 
-void mat4_setPosition(mat4 *matrix, vec *pos);
-
-void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar);
-
-void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, F32 far);
-
-void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up);
-
-/// Reference is based off of datenwolf's linmath library released under WTFPL 2.0
-void mat4_invert(mat4 *dest, mat4 *mat);
-
-void mat4_mul_vec4(vec4 *dest, mat4 *mat, vec4 *vec);
+bool rayAABBTest(vec *rayDir, vec *rayOrigin, AABB *aabb);
 
 #endif

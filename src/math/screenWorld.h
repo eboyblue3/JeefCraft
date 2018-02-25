@@ -14,26 +14,24 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _MATH_MATRIX_H_
-#define _MATH_MATRIX_H_
+#ifndef _MATH_SCREENWORLD_H_
+#define _MATH_SCREENWORLD_H_
 
-#include <math.h>
 #include <stb_vec.h>
 #include "base/types.h"
 
-void mat4_getPosition(vec *dest, mat4 *src);
-
-void mat4_setPosition(mat4 *matrix, vec *pos);
-
-void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar);
-
-void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, F32 far);
-
-void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up);
-
-/// Reference is based off of datenwolf's linmath library released under WTFPL 2.0
-void mat4_invert(mat4 *dest, mat4 *mat);
-
-void mat4_mul_vec4(vec4 *dest, mat4 *mat, vec4 *vec);
+/// Casts a ray from screen space to world space.
+/// @param mouseX The x position of the mouse.
+/// @param mouseY The y position of the mouse.
+/// @param width The width of the screen.
+/// @param height The height of the screen.
+/// @param view The view matrix of the camera we are testing.
+/// @param proj The projection matrix of the camera we are testing.
+/// @param rayOrigin OUT - The origin of the ray that we are returning.
+/// @param rayDir OUT - The direction of the ray that we are returning.
+///
+/// @reference Implementation is based on opengl-tutorial.com which is released
+/// under the WTFPL 2.0
+void raycastScreenToWorld(F32 mouseX, F32 mouseY, F32 width, F32 height, mat4 *view, mat4 *proj, vec *rayOrigin, vec *rayDir);
 
 #endif
