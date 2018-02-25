@@ -683,21 +683,14 @@ void renderWorld(F32 dt) {
 
    // Do our raycast to screen world.
    Vec3 rayOrigin;
-   getCameraPosition(&rayOrigin);
-
-   Vec4 forward = {{0, 0, -1, 0}};
    Vec4 rayDir;
-
-   mat4 inverse_view;
-   glm_mat4_inv(view, inverse_view);
-
-   glm_mat4_mulv(inverse_view, forward.vec, rayDir.vec);
+   screenRayToWorld(view, &rayOrigin, &rayDir);
 
    // Check to see if we have something within 8 blocks away.
    Vec3 point = rayOrigin;
    Vec3 scalar;
    glm_vec_scale(rayDir.vec, 0.01f, scalar.vec);
-   for (S32 i = 0; i < 800; ++i) {
+   for (S32 i = 0; i < 400; ++i) {
       glm_vec_add(point.vec, scalar.vec, point.vec);
 
       Vec3 pos = create_vec3(floorf(point.x), floorf(point.y), floorf(point.z));
