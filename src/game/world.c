@@ -28,6 +28,7 @@
 #include "platform/input.h"
 #include "math/screenWorld.h"
 #include "math/aabb.h"
+#include "platform/input.h"
 
 #define CHUNK_WIDTH 16
 #define MAX_CHUNK_HEIGHT 256
@@ -108,6 +109,8 @@ typedef struct RenderChunk {
 } RenderChunk;
 
 typedef struct Chunk {
+   S32 startX;
+   S32 startZ;
    Cube *cubeData;                         /// Cube data for full chunk
    RenderChunk renderChunks[CHUNK_SPLITS]; /// Per-render chunk data.
 } Chunk;
@@ -183,6 +186,19 @@ static inline bool isTransparentAtCube(Cube *c) {
    if (c == NULL)
       return false;
    return c->material == Material_Air;
+}
+
+static inline Chunk* getChunkAtWorldSpacePosition(S32 x, S32 y, S32 z) {
+   // first calculate chunk based upon position.
+   S32 chunkX = x < 0 ? ((x + 1) / CHUNK_WIDTH) - 1 : x / CHUNK_WIDTH;
+   S32 chunkZ = z < 0 ? ((z + 1) / CHUNK_WIDTH) - 1 : z / CHUNK_WIDTH;
+
+   // Don't go past.
+   if (chunkX < -worldSize || chunkX >= worldSize || chunkZ < -worldSize || chunkZ >= worldSize)
+      return NULL;
+
+   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+   return chunk;
 }
 
 static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
@@ -360,9 +376,10 @@ void generateCavesAndStructures(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) 
    }
 }
 
-void generateGeometry(S32 chunkX, S32 chunkZ) {
-   Chunk *chunk = getChunkAt(chunkX, chunkZ);
+void generateGeometry(Chunk *chunk) {
    Cube *cubeData = chunk->cubeData;
+   S32 chunkX = chunk->startX;
+   S32 chunkZ = chunk->startZ;
 
    // Generate geometry.
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
@@ -456,9 +473,40 @@ void generateGeometry(S32 chunkX, S32 chunkZ) {
    }
 }
 
-
 GLuint singleBufferCubeVBO;
 GLuint singleBufferCubeIBO;
+
+void uploadChunkToGL(Chunk *chunk) {
+   for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
+      RenderChunk *r = &chunk->renderChunks[i];
+      if (r->vertexCount > 0) {
+         glGenBuffers(1, &r->vbo);
+         glGenBuffers(1, &r->ibo);
+
+         glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
+         glBufferData(GL_ARRAY_BUFFER, sizeof(GPUVertex) * r->vertexCount, r->vertexData, GL_STATIC_DRAW);
+
+         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r->ibo);
+         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * r->indiceCount, r->indices, GL_STATIC_DRAW);
+      }
+
+      // Free right after uploading to the GL. We don't need gpu data
+      // in both system and gpu ram.
+      sb_free(r->vertexData);
+      sb_free(r->indices);
+   }
+}
+
+void freeChunkGL(Chunk *chunk) {
+   for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
+      RenderChunk *r = &chunk->renderChunks[i];
+      if (r->vertexCount > 0) {
+         glDeleteBuffers(1, &r->vbo);
+         glDeleteBuffers(1, &r->ibo);
+      }
+      memset(r, 0, sizeof(RenderChunk));
+   }
+}
 
 void uploadGeometryToGL() {
    // *Single threaded*
@@ -470,24 +518,7 @@ void uploadGeometryToGL() {
    // TODO: use VAO if extension is supported??
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
-         for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
-            RenderChunk *r = &getChunkAt(x, z)->renderChunks[i];
-            if (r->vertexCount > 0) {
-               glGenBuffers(1, &r->vbo);
-               glGenBuffers(1, &r->ibo);
-
-               glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
-               glBufferData(GL_ARRAY_BUFFER, sizeof(GPUVertex) * r->vertexCount, r->vertexData, GL_STATIC_DRAW);
-
-               glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r->ibo);
-               glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * r->indiceCount, r->indices, GL_STATIC_DRAW);
-            }
-
-            // Free right after uploading to the GL. We don't need gpu data
-            // in both system and gpu ram.
-            sb_free(r->vertexData);
-            sb_free(r->indices);
-         }
+         uploadChunkToGL(getChunkAt(x, z));
       }
    }
 
@@ -571,7 +602,10 @@ void initWorld() {
 //#pragma omp parallel for
    for (S32 x = -worldSize; x < worldSize; ++x) {
       for (S32 z = -worldSize; z < worldSize; ++z) {
-         generateGeometry(x, z);
+         Chunk * chunk = getChunkAt(x, z);
+         chunk->startX = x;
+         chunk->startZ = z;
+         generateGeometry(chunk);
       }
    }
 
@@ -585,13 +619,7 @@ void freeWorld() {
       for (S32 z = -worldSize; z < worldSize; ++z) {
          Chunk *c = getChunkAt(x, z);
          free(c->cubeData);
-         for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
-            RenderChunk *r = &c->renderChunks[i];
-            if (r->vertexCount > 0) {
-               glDeleteBuffers(1, &r->vbo);
-               glDeleteBuffers(1, &r->ibo);
-            }
-         }
+         freeChunkGL(c);
       }
    }
 
@@ -718,6 +746,21 @@ void renderWorld(F32 dt) {
          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, singleBufferCubeIBO);
          glDrawElements(GL_TRIANGLES, (GLsizei)36, GL_UNSIGNED_INT, (void*)0);
          glDisableVertexAttribArray(0);
+
+         // TODO: Have mouse click. For now hit the G key.
+         if (inputGetKeyStatus(KEY_G) == PRESSED) {
+            // Set cube to air.
+            c->material = Material_Air;
+
+            // Rebuild chunk.
+            // TODO: determine if chunks around this chunk need rebuilt. If so rebuild them too.
+            // TODO: only rebuild render chunk instead of the entire 16x256x16 chunk
+            Chunk *chunk = getChunkAtWorldSpacePosition((S32)pos.x, (S32)pos.y, (S32)pos.z);
+            freeChunkGL(chunk);
+            generateGeometry(chunk);
+            uploadChunkToGL(chunk);
+         }
+
          break;
       }
    }
