@@ -14,35 +14,18 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _MATH_FRUSTUM_H_
-#define _MATH_FRUSTUM_H_
+#ifndef _MATH_AABB_H_
+#define _MATH_AABB_H_
 
 #include "math/math.h"
 
-typedef struct FrustumPlane {
-   F32 x;
-   F32 y;
-   F32 z;
-   F32 n;
-} FrustumPlane;
+typedef struct {
+   Vec3 min;
+   Vec3 max;
+} AABB;
 
-typedef enum {
-   FRUSTUM_LEFT = 0,
-   FRUSTUM_RIGHT,
-   FRUSTUM_TOP,
-   FRUSTUM_BOTTOM,
-   FRUSTUM_NEAR,
-   FRUSTUM_FAR,
+void aabbFromCenterPoint(AABB *dest, Vec3 center, F32 radius);
 
-   FRUSTUM_LOOP_COUNT // For Loop Count from left-far
-} FrustumPlaneId;
-
-typedef struct Frustum {
-   FrustumPlane planes[FRUSTUM_LOOP_COUNT];
-} Frustum;
-
-void computeFrustum(mat4 mvp, Frustum *frustum);
-
-bool FrustumCullSquareBox(Frustum *frustum, Vec3 center, float halfExtent);
+bool rayAABBTest(Vec3 rayDir, Vec3 rayOrigin, AABB *aabb);
 
 #endif

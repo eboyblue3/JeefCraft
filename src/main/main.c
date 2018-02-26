@@ -16,7 +16,6 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stb_vec.h>
 #include <GL/glew.h>
 #include <open-simplex-noise.h>
 #include "base/types.h"
@@ -24,9 +23,9 @@
 #include "platform/platform.h"
 #include "platform/input.h"
 #include "graphics/shader.h"
-#include "math/matrix.h"
 #include "game/camera.h"
 #include "game/world.h"
+#include "math/math.h"
 
 extern S32 gVisibleChunks;
 extern S32 gTotalChunks;
@@ -65,13 +64,16 @@ int main(int argc, char **argv) {
    char fpsBuffer[FPS_BUFFER_SIZE];
 
    // Set initial camera position
-   vec cameraPos = vec3(-5.0f, 80.0f, 0.0f);
-   setCameraPosition(&cameraPos);
+   Vec3 cameraPos;
+   cameraPos.x = -5.0f;
+   cameraPos.y = 80.0f;
+   cameraPos.z = 0.0f;
+   setCameraPosition(cameraPos);
 
    // Set projection matrix
    mat4 proj;
-   mat4_perspective(&proj, 1.5708f, 1440.0f / 900.0f, 0.01f, getViewDistance());
-   setCameraProjMatrix(&proj);
+   glm_perspective(1.5708f, 1440.0f / 900.0f, 0.01f, getViewDistance(), proj);
+   setCameraProjMatrix(proj);
 
    while (gRunning) {
       // Calculate mouse movement for frame.
@@ -83,7 +85,7 @@ int main(int argc, char **argv) {
       lastTime = current;
 
       if ((current - secondTime) >= 1.0) { // 1 second.
-         vec pos;
+         Vec3 pos;
          getCameraPosition(&pos);
 
          memset(fpsBuffer, 0, FPS_BUFFER_SIZE);

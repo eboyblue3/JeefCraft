@@ -14,35 +14,11 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _MATH_FRUSTUM_H_
-#define _MATH_FRUSTUM_H_
+#ifndef _MATH_SCREENWORLD_H_
+#define _MATH_SCREENWORLD_H_
 
 #include "math/math.h"
 
-typedef struct FrustumPlane {
-   F32 x;
-   F32 y;
-   F32 z;
-   F32 n;
-} FrustumPlane;
-
-typedef enum {
-   FRUSTUM_LEFT = 0,
-   FRUSTUM_RIGHT,
-   FRUSTUM_TOP,
-   FRUSTUM_BOTTOM,
-   FRUSTUM_NEAR,
-   FRUSTUM_FAR,
-
-   FRUSTUM_LOOP_COUNT // For Loop Count from left-far
-} FrustumPlaneId;
-
-typedef struct Frustum {
-   FrustumPlane planes[FRUSTUM_LOOP_COUNT];
-} Frustum;
-
-void computeFrustum(mat4 mvp, Frustum *frustum);
-
-bool FrustumCullSquareBox(Frustum *frustum, Vec3 center, float halfExtent);
+void screenRayToWorld(mat4 viewMatrix, Vec3 *rayOrigin, Vec4 *rayDirection);
 
 #endif

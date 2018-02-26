@@ -15,7 +15,6 @@
 //----------------------------------------------------------------------------
 
 #include <string.h>
-#include "math/matrix.h"
 #include "game/camera.h"
 #include "platform/input.h"
 
@@ -28,7 +27,7 @@
 #define PITCH_MAX (PI_2 - 0.2f)
 
 typedef struct CameraInfo {
-   vec position;
+   Vec3 position;
    F32 horiziontalAngle;
    F32 verticalAngle;
    mat4 currentViewMatrix;
@@ -38,12 +37,13 @@ typedef struct CameraInfo {
 CameraInfo gCameraInfo;
 
 void initCamera() {
-   gCameraInfo.position = vec3(0.0f, 0.0f, 0.0f);
+   gCameraInfo.position;
+   memset(gCameraInfo.position.vec, 0, sizeof(Vec3));
    gCameraInfo.horiziontalAngle = 0.0f;
    gCameraInfo.verticalAngle = -0.45f;
 }
 
-void getCameraPosition(vec *pos) {
+void getCameraPosition(Vec3 *pos) {
    pos->x = gCameraInfo.position.x;
    pos->y = gCameraInfo.position.y;
    pos->z = gCameraInfo.position.z;
@@ -57,14 +57,14 @@ void getCurrentViewMatrix(mat4 *mat) {
    memcpy(mat, &gCameraInfo.currentViewMatrix, sizeof(mat4));
 }
 
-void setCameraProjMatrix(mat4 *mat) {
+void setCameraProjMatrix(mat4 mat) {
    memcpy(&gCameraInfo.currentProjMatrix, mat, sizeof(mat4));
 }
 
-void setCameraPosition(vec *pos) {
-   gCameraInfo.position.x = pos->x;
-   gCameraInfo.position.y = pos->y;
-   gCameraInfo.position.z = pos->z;
+void setCameraPosition(Vec3 pos) {
+   gCameraInfo.position.x = pos.x;
+   gCameraInfo.position.y = pos.y;
+   gCameraInfo.position.z = pos.z;
 }
 
 void getCameraFrustum(Frustum *frustum) {
@@ -90,20 +90,20 @@ void calculateFreecamViewMatrix(F32 delta) {
       gCameraInfo.verticalAngle = PITCH_MAX;
 
    // Direction
-   vec direction;
+   Vec3 direction;
    direction.x = cosf(gCameraInfo.verticalAngle) * sinf(gCameraInfo.horiziontalAngle);
    direction.y = sinf(gCameraInfo.verticalAngle);
    direction.z = cosf(gCameraInfo.verticalAngle) * cosf(gCameraInfo.horiziontalAngle);
 
    // Right vector
-   vec right;
+   Vec3 right;
    right.x = sinf(gCameraInfo.horiziontalAngle - PI / 2.0f);
    right.y = 0.0f;
    right.z = cosf(gCameraInfo.horiziontalAngle - PI / 2.0f);
 
    // up
-   vec up;
-   vec_cross(&up, &right, &direction);
+   Vec3 up;
+   glm_vec_cross(right.vec, direction.vec, up.vec);
 
    // Process Movement with key checks.
    if (inputGetKeyStatus(KEY_W) == PRESSED) {
@@ -128,12 +128,12 @@ void calculateFreecamViewMatrix(F32 delta) {
    }
 
    // Finally calcuate the view matrix.
-   vec center;
-   vec_add(&center, &gCameraInfo.position, &direction);
-   mat4_lookAt(&gCameraInfo.currentViewMatrix, &gCameraInfo.position, &center, &up);
+   Vec3 center;
+   glm_vec_add(gCameraInfo.position.vec, direction.vec, center.vec);
+   glm_lookat(gCameraInfo.position.vec, center.vec, up.vec, gCameraInfo.currentViewMatrix);
 
    // Update frustum
    mat4 mvp;
-   mat4_mul(&mvp, &gCameraInfo.currentProjMatrix, &gCameraInfo.currentViewMatrix);
-   computeFrustum(&mvp, &gCameraInfo.frustum);
+   glm_mat4_mul(gCameraInfo.currentProjMatrix, gCameraInfo.currentViewMatrix, mvp);
+   computeFrustum(mvp, &gCameraInfo.frustum);
 }

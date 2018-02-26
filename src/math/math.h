@@ -14,21 +14,39 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _MATH_MATRIX_H_
-#define _MATH_MATRIX_H_
+#ifndef _MATH_MATH_H_
+#define _MATH_MATH_H_
 
-#include <math.h>
-#include <stb_vec.h>
+#include <cglm/cglm.h>
 #include "base/types.h"
 
-void mat4_getPosition(vec *dest, mat4 *src);
+typedef union {
+   vec3 vec;
 
-void mat4_setPosition(mat4 *matrix, vec *pos);
+   struct {
+      F32 x;
+      F32 y;
+      F32 z;
+   };
+} Vec3;
 
-void mat4_perspective(mat4 *dest, F32 fov, F32 aspect, F32 zNear, F32 zFar);
+typedef union {
+   vec4 vec;
 
-void mat4_ortho(mat4 *dest, F32 left, F32 right, F32 bottom, F32 top, F32 near, F32 far);
+   struct {
+      F32 x;
+      F32 y;
+      F32 z;
+      F32 w;
+   };
+} Vec4;
 
-void mat4_lookAt(mat4 *dest, vec *eye, vec *center, vec *up);
+static inline Vec3 create_vec3(F32 x, F32 y, F32 z) {
+   Vec3 v;
+   v.x = x;
+   v.y = y;
+   v.z = z;
+   return v;
+}
 
 #endif

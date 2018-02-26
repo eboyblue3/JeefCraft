@@ -14,10 +14,17 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#include <math.h>
-#include <assert.h>
-#include <string.h>
+#include "math/screenWorld.h"
 
-// Include the file to compile it.
-#define STB_DEFINE
-#include <stb_vec.h>
+void screenRayToWorld(mat4 viewMatrix, Vec3 *rayOrigin, Vec4 *rayDirection) {
+   Vec4 forward = { { 0, 0, -1, 0 } };
+
+   mat4 inverse_view;
+   glm_mat4_inv(viewMatrix, inverse_view);
+
+   rayOrigin->x = inverse_view[3][0];
+   rayOrigin->y = inverse_view[3][1];
+   rayOrigin->z = inverse_view[3][2];
+
+   glm_mat4_mulv(inverse_view, forward.vec, rayDirection->vec);
+}
