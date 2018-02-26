@@ -179,6 +179,8 @@ F32 getViewDistance() {
 }
 
 static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
+   assert(cubeData);
+   assert(getCubeAt(cubeData, x, y, z));
    return getCubeAt(cubeData, x, y, z)->material == Material_Air;
 }
 
@@ -199,6 +201,35 @@ static inline Chunk* getChunkAtWorldSpacePosition(S32 x, S32 y, S32 z) {
 
    Chunk *chunk = getChunkAt(chunkX, chunkZ);
    return chunk;
+}
+
+static inline RenderChunk* getRenderChunkAtWorldSpacePosition(S32 x, S32 y, S32 z, S32 *renderChunkIndex) {
+   Chunk *chunk = getChunkAtWorldSpacePosition(x, y, z);
+   if (chunk == NULL)
+      return NULL;
+   assert(y >= 0); // Ensure y is >= 0
+   assert(y < MAX_CHUNK_HEIGHT); // Ensure chunk is < MAX_CHUNK_HEIGHT
+
+   *renderChunkIndex = y / RENDER_CHUNK_HEIGHT;
+   return &chunk->renderChunks[*renderChunkIndex];
+}
+
+static inline void globalPosToLocalPos(S32 x, S32 y, S32 z, S32 *localX, S32 *localY, S32 *localZ) {
+   // first calculate chunk based upon position.
+   S32 chunkX = x < 0 ? ((x + 1) / CHUNK_WIDTH) - 1 : x / CHUNK_WIDTH;
+   S32 chunkZ = z < 0 ? ((z + 1) / CHUNK_WIDTH) - 1 : z / CHUNK_WIDTH;
+   S32 chunkY = y / RENDER_CHUNK_HEIGHT;
+
+   *localX = x - (chunkX * CHUNK_WIDTH);
+   *localZ = z - (chunkZ * CHUNK_WIDTH);
+   *localY = y - (chunkY * RENDER_CHUNK_HEIGHT);
+
+   assert(*localX >= 0);
+   assert(*localZ >= 0);
+   assert(*localY >= 0);
+   assert(*localX < CHUNK_WIDTH);
+   assert(*localZ < CHUNK_WIDTH);
+   assert(*localY < RENDER_CHUNK_HEIGHT);
 }
 
 static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
@@ -376,135 +407,145 @@ void generateCavesAndStructures(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) 
    }
 }
 
-void generateGeometry(Chunk *chunk) {
+void generateGeometryForRenderChunk(Chunk *chunk, S32 renderChunkId) {
    Cube *cubeData = chunk->cubeData;
    S32 chunkX = chunk->startX;
    S32 chunkZ = chunk->startZ;
 
-   // Generate geometry.
    for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
       for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
-         // Split up y axis into render chunks and calc y
-         for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
-            for (S32 j = 0; j < RENDER_CHUNK_HEIGHT; ++j) {
-               S32 y = (RENDER_CHUNK_HEIGHT * i) + j;
-               Vec3 localPos;
-               localPos.x = (F32)x;
-               localPos.y = (F32)y;
-               localPos.z = (F32)z;
+         for (S32 j = 0; j < RENDER_CHUNK_HEIGHT; ++j) {
+            S32 y = (RENDER_CHUNK_HEIGHT * renderChunkId) + j;
+            Vec3 localPos;
+            localPos.x = (F32)x;
+            localPos.y = (F32)y;
+            localPos.z = (F32)z;
 
-               // skip if current block is transparent.
-               if (isTransparent(cubeData, x, y, z))
-                  continue;
+            // skip if current block is transparent.
+            if (isTransparent(cubeData, x, y, z))
+               continue;
 
-               // Cross chunk checking. Only need to check x and z axes.
-               // If the next *chunk* over is is transparent then ya we have
-               // to render regardless.
-               bool isOpaqueNegativeX = false;
-               bool isOpaquePositiveX = false;
-               bool isOpaqueNegativeZ = false;
-               bool isOpaquePositiveZ = false;
+            // Cross chunk checking. Only need to check x and z axes.
+            // If the next *chunk* over is is transparent then ya we have
+            // to render regardless.
+            bool isOpaqueNegativeX = false;
+            bool isOpaquePositiveX = false;
+            bool isOpaqueNegativeZ = false;
+            bool isOpaquePositiveZ = false;
 
-               if (x == 0 && chunkX > -worldSize) {
-                  Cube *behindData = getChunkAt(chunkX - 1, chunkZ)->cubeData;
-                  if (!isTransparent(behindData, CHUNK_WIDTH - 1, y, z)) {
-                     // The cube behind us on the previous chunk is in fact
-                     // transparent. We need to render this face.
-                     isOpaqueNegativeX = true;
-                  }
+            if (x == 0 && chunkX > -worldSize) {
+               Cube *behindData = getChunkAt(chunkX - 1, chunkZ)->cubeData;
+               if (!isTransparent(behindData, CHUNK_WIDTH - 1, y, z)) {
+                  // The cube behind us on the previous chunk is in fact
+                  // transparent. We need to render this face.
+                  isOpaqueNegativeX = true;
                }
-               if (x == (CHUNK_WIDTH - 1) && (chunkX + 1) < worldSize) {
-                  Cube *behindData = getChunkAt(chunkX + 1, chunkZ)->cubeData;
-                  if (!isTransparent(behindData, 0, y, z)) {
-                     // The cube behind us on the previous chunk is in fact
-                     // transparent. We need to render this face.
-                     isOpaquePositiveX = true;
-                  }
-               }
-               if (z == 0 && chunkZ > -worldSize) {
-                  Cube *behindData = getChunkAt(chunkX, chunkZ - 1)->cubeData;
-                  if (!isTransparent(behindData, x, y, CHUNK_WIDTH - 1)) {
-                     // The cube behind us on the previous chunk is in fact
-                     // transparent. We need to render this face.
-                     isOpaqueNegativeZ = true;
-                  }
-               }
-               if (z == (CHUNK_WIDTH - 1) && (chunkZ + 1) < worldSize) {
-                  Cube *behindData = getChunkAt(chunkX, chunkZ + 1)->cubeData;
-                  if (!isTransparent(behindData, x, y, 0)) {
-                     // The cube behind us on the previous chunk is in fact
-                     // transparent. We need to render this face.
-                     isOpaquePositiveZ = true;
-                  }
-               }
-
-               // check all 6 directions to see if the cube is exposed.
-               // If the cube is exposed in that direction, render that face.
-
-               S32 material = getCubeAt(cubeData, x, y, z)->material;
-
-               if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
-                  buildFace(chunk, i, CubeSides_Up, material, localPos);
-
-               // If this is grass, bottom has to be dirt.
-
-               if (y == 0 || isTransparent(cubeData, x, y - 1, z))
-                  buildFace(chunk, i, CubeSides_Down, (material == Material_Grass ? Material_Dirt : material), localPos);
-
-               // After we built the top, this is a special case for grass.
-               // If we are actually building grass sides it has to be special.
-               if (material == Material_Grass)
-                  material = Material_Grass_Side;
-
-               if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
-                  buildFace(chunk, i, CubeSides_West, material, localPos);
-
-               if ((!isOpaquePositiveX && x >= (CHUNK_WIDTH - 1)) || (x < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x + 1, y, z)))
-                  buildFace(chunk, i, CubeSides_East, material, localPos);
-
-               if ((!isOpaqueNegativeZ && z == 0) || (z > 0 && isTransparent(cubeData, x, y, z - 1)))
-                  buildFace(chunk, i, CubeSides_South, material, localPos);
-
-               if ((!isOpaquePositiveZ && z >= (CHUNK_WIDTH - 1)) || (z < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x, y, z + 1)))
-                  buildFace(chunk, i, CubeSides_North, material, localPos);
             }
+            if (x == (CHUNK_WIDTH - 1) && (chunkX + 1) < worldSize) {
+               Cube *behindData = getChunkAt(chunkX + 1, chunkZ)->cubeData;
+               if (!isTransparent(behindData, 0, y, z)) {
+                  // The cube behind us on the previous chunk is in fact
+                  // transparent. We need to render this face.
+                  isOpaquePositiveX = true;
+               }
+            }
+            if (z == 0 && chunkZ > -worldSize) {
+               Cube *behindData = getChunkAt(chunkX, chunkZ - 1)->cubeData;
+               if (!isTransparent(behindData, x, y, CHUNK_WIDTH - 1)) {
+                  // The cube behind us on the previous chunk is in fact
+                  // transparent. We need to render this face.
+                  isOpaqueNegativeZ = true;
+               }
+            }
+            if (z == (CHUNK_WIDTH - 1) && (chunkZ + 1) < worldSize) {
+               Cube *behindData = getChunkAt(chunkX, chunkZ + 1)->cubeData;
+               if (!isTransparent(behindData, x, y, 0)) {
+                  // The cube behind us on the previous chunk is in fact
+                  // transparent. We need to render this face.
+                  isOpaquePositiveZ = true;
+               }
+            }
+
+            // check all 6 directions to see if the cube is exposed.
+            // If the cube is exposed in that direction, render that face.
+
+            S32 material = getCubeAt(cubeData, x, y, z)->material;
+
+            if (y >= (MAX_CHUNK_HEIGHT - 1) || isTransparent(cubeData, x, y + 1, z))
+               buildFace(chunk, renderChunkId, CubeSides_Up, material, localPos);
+
+            // If this is grass, bottom has to be dirt.
+
+            if (y == 0 || isTransparent(cubeData, x, y - 1, z))
+               buildFace(chunk, renderChunkId, CubeSides_Down, (material == Material_Grass ? Material_Dirt : material), localPos);
+
+            // After we built the top, this is a special case for grass.
+            // If we are actually building grass sides it has to be special.
+            if (material == Material_Grass)
+               material = Material_Grass_Side;
+
+            if ((!isOpaqueNegativeX && x == 0) || (x > 0 && isTransparent(cubeData, x - 1, y, z)))
+               buildFace(chunk, renderChunkId, CubeSides_West, material, localPos);
+
+            if ((!isOpaquePositiveX && x >= (CHUNK_WIDTH - 1)) || (x < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x + 1, y, z)))
+               buildFace(chunk, renderChunkId, CubeSides_East, material, localPos);
+
+            if ((!isOpaqueNegativeZ && z == 0) || (z > 0 && isTransparent(cubeData, x, y, z - 1)))
+               buildFace(chunk, renderChunkId, CubeSides_South, material, localPos);
+
+            if ((!isOpaquePositiveZ && z >= (CHUNK_WIDTH - 1)) || (z < (CHUNK_WIDTH - 1) && isTransparent(cubeData, x, y, z + 1)))
+               buildFace(chunk, renderChunkId, CubeSides_North, material, localPos);
          }
       }
+   }
+}
+
+void generateGeometry(Chunk *chunk) {
+   for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
+      generateGeometryForRenderChunk(chunk, i);
    }
 }
 
 GLuint singleBufferCubeVBO;
 GLuint singleBufferCubeIBO;
 
+void uploadRenderChunkToGL(RenderChunk *r) {
+   if (r->vertexCount > 0) {
+      glGenBuffers(1, &r->vbo);
+      glGenBuffers(1, &r->ibo);
+
+      glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(GPUVertex) * r->vertexCount, r->vertexData, GL_STATIC_DRAW);
+
+      glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r->ibo);
+      glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * r->indiceCount, r->indices, GL_STATIC_DRAW);
+   }
+
+   // Free right after uploading to the GL. We don't need gpu data
+   // in both system and gpu ram.
+   sb_free(r->vertexData);
+   sb_free(r->indices);
+}
+
 void uploadChunkToGL(Chunk *chunk) {
    for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
       RenderChunk *r = &chunk->renderChunks[i];
-      if (r->vertexCount > 0) {
-         glGenBuffers(1, &r->vbo);
-         glGenBuffers(1, &r->ibo);
-
-         glBindBuffer(GL_ARRAY_BUFFER, r->vbo);
-         glBufferData(GL_ARRAY_BUFFER, sizeof(GPUVertex) * r->vertexCount, r->vertexData, GL_STATIC_DRAW);
-
-         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, r->ibo);
-         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GPUIndex) * r->indiceCount, r->indices, GL_STATIC_DRAW);
-      }
-
-      // Free right after uploading to the GL. We don't need gpu data
-      // in both system and gpu ram.
-      sb_free(r->vertexData);
-      sb_free(r->indices);
+      uploadRenderChunkToGL(r);
    }
+}
+
+static inline void freeRenderChunkGL(RenderChunk *r) {
+   if (r->vertexCount > 0) {
+      glDeleteBuffers(1, &r->vbo);
+      glDeleteBuffers(1, &r->ibo);
+   }
+   memset(r, 0, sizeof(RenderChunk));
 }
 
 void freeChunkGL(Chunk *chunk) {
    for (S32 i = 0; i < CHUNK_SPLITS; ++i) {
       RenderChunk *r = &chunk->renderChunks[i];
-      if (r->vertexCount > 0) {
-         glDeleteBuffers(1, &r->vbo);
-         glDeleteBuffers(1, &r->ibo);
-      }
-      memset(r, 0, sizeof(RenderChunk));
+      freeRenderChunkGL(r);
    }
 }
 
@@ -631,6 +672,71 @@ void freeWorld() {
    open_simplex_noise_free(osn);
 }
 
+void freeGenerateUpdate(Chunk *c, RenderChunk *r, S32 renderChunkId) {
+   assert(c);
+   assert(r);
+
+   freeRenderChunkGL(r);
+   generateGeometryForRenderChunk(c, renderChunkId);
+   uploadRenderChunkToGL(r);
+}
+
+void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
+   // Bounds check on removing cube if we are at a boundary.
+   if (x == -worldSize * CHUNK_WIDTH ||
+      x == worldSize * CHUNK_WIDTH ||
+      z == -worldSize * CHUNK_WIDTH ||
+      z == worldSize * CHUNK_WIDTH ||
+      y == 0 ||
+      y == MAX_CHUNK_HEIGHT) {
+      printf("Cannot remove cube at %d %d %d. It is at a world edge boundary!\n", x, y, z);
+      return;
+   }
+
+   cube->material = Material_Air;
+
+   // Rebuild this *render chunk*
+   S32 renderChunkId;
+   Chunk *c = getChunkAtWorldSpacePosition(x, y, z);
+   RenderChunk *r = getRenderChunkAtWorldSpacePosition(x, y, z, &renderChunkId);
+   freeGenerateUpdate(c, r, renderChunkId);
+
+   // Check x,y,z axes to see if they lay on render chunk boundaries.
+   // If they do, we need to update the render chunk that is next to it.
+   S32 localX, localY, localZ;
+   globalPosToLocalPos(x, y, z, &localX, &localY, &localZ);
+
+   if (localX == 0) {
+      c = getChunkAtWorldSpacePosition(x - CHUNK_WIDTH, y, z);
+      r = getRenderChunkAtWorldSpacePosition(x - CHUNK_WIDTH, y, z, &renderChunkId);
+      freeGenerateUpdate(c, r, renderChunkId);
+   } else if (localX >= (CHUNK_WIDTH - 1)) {
+      c = getChunkAtWorldSpacePosition(x + CHUNK_WIDTH, y, z);
+      r = getRenderChunkAtWorldSpacePosition(x + CHUNK_WIDTH, y, z, &renderChunkId);
+      freeGenerateUpdate(c, r, renderChunkId);
+   }
+
+   if (localY == 0) {
+      c = getChunkAtWorldSpacePosition(x, y - RENDER_CHUNK_HEIGHT, z);
+      r = getRenderChunkAtWorldSpacePosition(x, y - RENDER_CHUNK_HEIGHT, z, &renderChunkId);
+      freeGenerateUpdate(c, r, renderChunkId);
+   } else if (localY >= (RENDER_CHUNK_HEIGHT - 1)) {
+      c = getChunkAtWorldSpacePosition(x, y + RENDER_CHUNK_HEIGHT, z);
+      r = getRenderChunkAtWorldSpacePosition(x, y + RENDER_CHUNK_HEIGHT, z, &renderChunkId);
+      freeGenerateUpdate(c, r, renderChunkId);
+   }
+
+   if (localZ == 0) {
+      c = getChunkAtWorldSpacePosition(x, y, z - CHUNK_WIDTH);
+      r = getRenderChunkAtWorldSpacePosition(x, y, z - CHUNK_WIDTH, &renderChunkId);
+      freeGenerateUpdate(c, r, renderChunkId);
+   } else if (localZ >= (CHUNK_WIDTH - 1)) {
+      c = getChunkAtWorldSpacePosition(x, y, z + CHUNK_WIDTH);
+      r = getRenderChunkAtWorldSpacePosition(x, y, z + CHUNK_WIDTH, &renderChunkId);
+      freeGenerateUpdate(c, r, renderChunkId);
+   }
+}
+
 bool orthoFlag = false;
 
 void renderWorld(F32 dt) {
@@ -753,17 +859,7 @@ void renderWorld(F32 dt) {
 
          // TODO: Have mouse click. For now hit the G key.
          if (pickerStatus == RELEASED && inputGetKeyStatus(KEY_G) == PRESSED) {
-            // Set cube to air.
-            c->material = Material_Air;
-
-            // Rebuild chunk.
-            // TODO: determine if chunks around this chunk need rebuilt. If so rebuild them too.
-            // TODO: only rebuild render chunk instead of the entire 16x256x16 chunk
-            Chunk *chunk = getChunkAtWorldSpacePosition((S32)pos.x, (S32)pos.y, (S32)pos.z);
-            freeChunkGL(chunk);
-            generateGeometry(chunk);
-            uploadChunkToGL(chunk);
-
+            removeCubeAtWorldPosition(c, (S32)pos.x, (S32)pos.y, (S32)pos.z);
             pickerStatus = PRESSED;
          } else if (inputGetKeyStatus(KEY_G) == RELEASED) {
             // set picker status to released
