@@ -549,9 +549,13 @@ int gVisibleChunks = 0;
 int gTotalVisibleChunks = 0;
 int gTotalChunks = 0;
 
+
 S32 pickerShaderProjMatrixLoc;
 S32 pickerShaderModelMatrixLoc;
 GLuint pickerProgram;
+
+// status of picking so we can't pick more than 1 in same keypress/mousepress
+int pickerStatus = RELEASED;
 
 void initWorld() {
    // Only 2 mip levels.
@@ -748,7 +752,7 @@ void renderWorld(F32 dt) {
          glDisableVertexAttribArray(0);
 
          // TODO: Have mouse click. For now hit the G key.
-         if (inputGetKeyStatus(KEY_G) == PRESSED) {
+         if (pickerStatus == RELEASED && inputGetKeyStatus(KEY_G) == PRESSED) {
             // Set cube to air.
             c->material = Material_Air;
 
@@ -759,6 +763,11 @@ void renderWorld(F32 dt) {
             freeChunkGL(chunk);
             generateGeometry(chunk);
             uploadChunkToGL(chunk);
+
+            pickerStatus = PRESSED;
+         } else if (inputGetKeyStatus(KEY_G) == RELEASED) {
+            // set picker status to released
+            pickerStatus = RELEASED;
          }
 
          break;
