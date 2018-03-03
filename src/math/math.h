@@ -49,4 +49,16 @@ static inline Vec3 create_vec3(F32 x, F32 y, F32 z) {
    return v;
 }
 
+static inline Vec4 create_vec4(F32 x, F32 y, F32 z, F32 w) {
+   Vec4 v;
+   v.x = x;
+   v.y = y;
+   v.z = z;
+   v.w = w;
+   return v;
+}
+
+// Pls.
+#define glm_vec_len glm_vec_norm
+
 #endif

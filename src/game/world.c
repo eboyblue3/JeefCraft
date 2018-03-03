@@ -55,6 +55,15 @@ static F32 cubeUVs[6][4][2] = {
    { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }  // south
 };
 
+static float cubeNormals[6][3] = {
+   {1.0f,0.0f,0.0f},  // East
+   {0.0f,1.0f,0.0f},  // Up
+   {-1.0f,0.0f,0.0f}, // West
+   {0.0f,-1.0f,0.0f}, // Down
+   {0.0f,0.0f,1.0f},  // North
+   {0.0f,0.0f,-1.0f} // South
+};
+
 typedef enum CubeSides {
    CubeSides_East,
    CubeSides_Up,
@@ -598,6 +607,9 @@ GLuint pickerProgram;
 // status of picking so we can't pick more than 1 in same keypress/mousepress
 int pickerStatus = RELEASED;
 
+// status of placing blocks so we can't spam place blocks
+int placingStatus = RELEASED;
+
 void initWorld() {
    // Only 2 mip levels.
    bool ret = createTexture2D("Assets/block_atlas.png", 4, 2, &textureAtlas);
@@ -681,20 +693,7 @@ void freeGenerateUpdate(Chunk *c, RenderChunk *r, S32 renderChunkId) {
    uploadRenderChunkToGL(r);
 }
 
-void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
-   // Bounds check on removing cube if we are at a boundary.
-   if (x == -worldSize * CHUNK_WIDTH ||
-      x == worldSize * CHUNK_WIDTH ||
-      z == -worldSize * CHUNK_WIDTH ||
-      z == worldSize * CHUNK_WIDTH ||
-      y == 0 ||
-      y == MAX_CHUNK_HEIGHT) {
-      printf("Cannot remove cube at %d %d %d. It is at a world edge boundary!\n", x, y, z);
-      return;
-   }
-
-   cube->material = Material_Air;
-
+static void remeshChunkGeometryAtGlobalPos(S32 x, S32 y, S32 z) {
    // Rebuild this *render chunk*
    S32 renderChunkId;
    Chunk *c = getChunkAtWorldSpacePosition(x, y, z);
@@ -710,7 +709,8 @@ void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
       c = getChunkAtWorldSpacePosition(x - CHUNK_WIDTH, y, z);
       r = getRenderChunkAtWorldSpacePosition(x - CHUNK_WIDTH, y, z, &renderChunkId);
       freeGenerateUpdate(c, r, renderChunkId);
-   } else if (localX >= (CHUNK_WIDTH - 1)) {
+   }
+   else if (localX >= (CHUNK_WIDTH - 1)) {
       c = getChunkAtWorldSpacePosition(x + CHUNK_WIDTH, y, z);
       r = getRenderChunkAtWorldSpacePosition(x + CHUNK_WIDTH, y, z, &renderChunkId);
       freeGenerateUpdate(c, r, renderChunkId);
@@ -720,7 +720,8 @@ void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
       c = getChunkAtWorldSpacePosition(x, y - RENDER_CHUNK_HEIGHT, z);
       r = getRenderChunkAtWorldSpacePosition(x, y - RENDER_CHUNK_HEIGHT, z, &renderChunkId);
       freeGenerateUpdate(c, r, renderChunkId);
-   } else if (localY >= (RENDER_CHUNK_HEIGHT - 1)) {
+   }
+   else if (localY >= (RENDER_CHUNK_HEIGHT - 1)) {
       c = getChunkAtWorldSpacePosition(x, y + RENDER_CHUNK_HEIGHT, z);
       r = getRenderChunkAtWorldSpacePosition(x, y + RENDER_CHUNK_HEIGHT, z, &renderChunkId);
       freeGenerateUpdate(c, r, renderChunkId);
@@ -730,10 +731,112 @@ void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
       c = getChunkAtWorldSpacePosition(x, y, z - CHUNK_WIDTH);
       r = getRenderChunkAtWorldSpacePosition(x, y, z - CHUNK_WIDTH, &renderChunkId);
       freeGenerateUpdate(c, r, renderChunkId);
-   } else if (localZ >= (CHUNK_WIDTH - 1)) {
+   }
+   else if (localZ >= (CHUNK_WIDTH - 1)) {
       c = getChunkAtWorldSpacePosition(x, y, z + CHUNK_WIDTH);
       r = getRenderChunkAtWorldSpacePosition(x, y, z + CHUNK_WIDTH, &renderChunkId);
       freeGenerateUpdate(c, r, renderChunkId);
+   }
+}
+
+void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
+   // Bounds check on removing cube if we are at a boundary.
+   if (x <= -worldSize * CHUNK_WIDTH ||
+      x >= worldSize * CHUNK_WIDTH ||
+      z <= -worldSize * CHUNK_WIDTH ||
+      z >= worldSize * CHUNK_WIDTH ||
+      y <= 0 ||
+      y >= MAX_CHUNK_HEIGHT) {
+      printf("Cannot remove cube at %d %d %d. It is at a world edge boundary!\n", x, y, z);
+      return;
+   }
+
+   cube->material = Material_Air;
+   remeshChunkGeometryAtGlobalPos(x, y, z);
+}
+
+static inline bool isFloatZero(F32 flt) {
+   return flt > -0.0001f && flt < 0.0001f;
+}
+
+bool rayIntersectsPlane(Vec3 rayOrigin, Vec3 rayDir, Vec4 plane, Vec3 *outPos) {
+   // t = -(ray_origin dot plane_normal + distance_from_plane) / (ray_dir dot normal)
+   // point_of_intersection = ray_origin + (t * ray_dir)
+
+   Vec3 normal = create_vec3(plane.x, plane.y, plane.z);
+   F32 rayNormal = glm_vec_dot(rayDir.vec, normal.vec);
+
+   // No divide by 0
+   if (isFloatZero(rayNormal))
+      return false;
+
+   Vec3 center;
+   glm_vec_scale(normal.vec, plane.w, center.vec);
+
+   Vec3 diff;
+   glm_vec_sub(center.vec, rayOrigin.vec, diff.vec);
+
+   F32 t = /*-*/(glm_vec_dot(diff.vec, normal.vec)/* + plane.w*/) / rayNormal;
+   if (isFloatZero(t))
+      return false;
+
+   // Get point of intersection
+   Vec3 scale;
+   glm_vec_scale(rayDir.vec, t, scale.vec);
+   glm_vec_add(rayOrigin.vec, scale.vec, outPos->vec);
+   return true;
+}
+
+void addCubeAtGlobalPos(Vec3 position) {
+   S32 x = (S32)position.x;
+   S32 y = (S32)position.y;
+   S32 z = (S32)position.z;
+
+   // Bounds check on removing cube if we are at a boundary.
+   if (x <= -worldSize * CHUNK_WIDTH ||
+      x >= worldSize * CHUNK_WIDTH ||
+      z <= -worldSize * CHUNK_WIDTH ||
+      z >= worldSize * CHUNK_WIDTH ||
+      y <= 0 ||
+      y >= MAX_CHUNK_HEIGHT) {
+      printf("Cannot remove cube at %d %d %d. It is at a world edge boundary!\n", x, y, z);
+      return;
+   }
+
+   // Just add bedrock for now.
+   getGlobalCubeAtWorldSpacePosition(x, y, z)->material = Material_Bedrock;
+   remeshChunkGeometryAtGlobalPos(x, y, z);
+}
+
+// Cube xyz
+void checkCubeAtLookAtCube(Vec3 cameraOrigin, Vec3 cameraDir, S32 x, S32 y, S32 z) {
+   Vec3 cubePos = create_vec3((F32)x, (F32)y, (F32)z);
+
+   Vec4 planes[6];
+   planes[0] = create_vec4(cubeNormals[0][0], cubeNormals[0][1], cubeNormals[0][2], x + 1); // East
+   planes[1] = create_vec4(cubeNormals[1][0], cubeNormals[1][1], cubeNormals[1][2], y + 1); // Up
+   planes[2] = create_vec4(cubeNormals[2][0], cubeNormals[2][1], cubeNormals[2][2], -x);    // West
+   planes[3] = create_vec4(cubeNormals[3][0], cubeNormals[3][1], cubeNormals[3][2], -y);    // Down
+   planes[4] = create_vec4(cubeNormals[4][0], cubeNormals[4][1], cubeNormals[4][2], z + 1); // North
+   planes[5] = create_vec4(cubeNormals[5][0], cubeNormals[5][1], cubeNormals[5][2], -z);    // South
+
+   // Get the face of the cube that we are touching.
+   for (S32 i = 0; i < 6; ++i) {
+      Vec3 norm = create_vec3(planes[i].x, planes[i].y, planes[i].z);
+      if (glm_vec_dot(cameraDir.vec, norm.vec) < 0.0f) {
+         Vec3 outPos;
+         if (rayIntersectsPlane(cameraOrigin, cameraDir, planes[i], &outPos)) {
+            // Cube test 'if cube contains point'
+            if (outPos.x >= cubePos.x && outPos.x <= cubePos.x + 1 &&
+                outPos.y >= cubePos.y && outPos.y <= cubePos.y + 1 &&
+                outPos.z >= cubePos.z && outPos.z <= cubePos.z + 1) {
+               // We found our plane!
+               glm_vec_add(cubePos.vec, norm.vec, cubePos.vec);
+               addCubeAtGlobalPos(cubePos);
+               break;
+            }
+         }
+      }
    }
 }
 
@@ -864,6 +967,14 @@ void renderWorld(F32 dt) {
          } else if (inputGetKeyStatus(KEY_G) == RELEASED) {
             // set picker status to released
             pickerStatus = RELEASED;
+         }
+
+         if (placingStatus == RELEASED && inputGetKeyStatus(KEY_H) == PRESSED) {
+            Vec3 rayDirection = create_vec3(rayDir.x, rayDir.y, rayDir.z);
+            checkCubeAtLookAtCube(rayOrigin, rayDirection, (S32)pos.x, (S32)pos.y, (S32)pos.z);
+            placingStatus = PRESSED;
+         } else if (inputGetKeyStatus(KEY_H) == RELEASED) {
+            placingStatus = RELEASED;
          }
 
          break;
