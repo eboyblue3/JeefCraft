@@ -24,7 +24,7 @@
 #include "platform/input.h"
 #include "graphics/shader.h"
 #include "game/camera.h"
-#include "game/world.h"
+#include "world/world.h"
 #include "math/math.h"
 
 extern S32 gVisibleChunks;

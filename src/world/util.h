@@ -14,14 +14,25 @@
 // limitations under the License.
 //----------------------------------------------------------------------------
 
-#ifndef _GAME_WORLD_H_
-#define _GAME_WORLD_H_
+#ifndef _WORLD_UTIL_H_
+#define _WORLD_UTIL_H_
 
-#include "base/types.h"
+#include "world/world.h"
 
-void initWorld();
-void freeWorld();
-F32 getViewDistance();
-void renderWorld(F32 dt);
+Chunk* getChunkAt(S32 x, S32 z);
 
-#endif // _GAME_WORLD_H_
+Cube* getCubeAt(Cube *cubeData, S32 x, S32 y, S32 z);
+
+bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z);
+
+bool isTransparentAtCube(Cube *c);
+
+Chunk* getChunkAtWorldSpacePosition(S32 x, S32 y, S32 z);
+
+RenderChunk* getRenderChunkAtWorldSpacePosition(S32 x, S32 y, S32 z, S32 *renderChunkIndex);
+
+void globalPosToLocalPos(S32 x, S32 y, S32 z, S32 *localX, S32 *localY, S32 *localZ);
+
+Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z);
+
+#endif

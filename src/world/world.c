@@ -17,112 +17,20 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
-#include <GL/glew.h>
 #include <stretchy_buffer.h>
 #include <open-simplex-noise.h>
-#include "game/world.h"
 #include "game/camera.h"
 #include "graphics/shader.h"
 #include "graphics/texture2d.h"
 #include "math/frustum.h"
+#include "math/ray.h"
 #include "platform/input.h"
 #include "math/screenWorld.h"
 #include "math/aabb.h"
 #include "platform/input.h"
-
-#define CHUNK_WIDTH 16
-#define MAX_CHUNK_HEIGHT 256
-#define RENDER_CHUNK_HEIGHT 16
-#define CHUNK_SIZE (S32)(MAX_CHUNK_HEIGHT * CHUNK_WIDTH * CHUNK_WIDTH)
-#define CHUNK_SPLITS (S32)(MAX_CHUNK_HEIGHT / RENDER_CHUNK_HEIGHT)
-
-// Taken from std_voxel_render.h, from the public domain
-static F32 cubes[6][4][4] = {
-   { { 1,0,1,0 },{ 1,1,1,0 },{ 1,1,0,0 },{ 1,0,0,0 } }, // east
-   { { 1,1,1,1 },{ 0,1,1,1 },{ 0,1,0,1 },{ 1,1,0,1 } }, // up
-   { { 0,1,1,2 },{ 0,0,1,2 },{ 0,0,0,2 },{ 0,1,0,2 } }, // west
-   { { 0,0,1,3 },{ 1,0,1,3 },{ 1,0,0,3 },{ 0,0,0,3 } }, // down
-   { { 0,1,1,4 },{ 1,1,1,4 },{ 1,0,1,4 },{ 0,0,1,4 } }, // north
-   { { 0,0,0,5 },{ 1,0,0,5 },{ 1,1,0,5 },{ 0,1,0,5 } }, // south
-};
-
-static F32 cubeUVs[6][4][2] = {
-   { { 0, 1 }, { 0, 0 }, { 1, 0 }, { 1, 1 } }, // East
-   { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }, // up
-   { { 1, 0 }, { 1, 1 }, { 0, 1 }, { 0, 0 } }, // west
-   { { 0, 1 }, { 1, 1 }, { 1, 0 }, { 0, 0 } }, // down
-   { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } }, // north
-   { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0 } }  // south
-};
-
-static float cubeNormals[6][3] = {
-   {1.0f,0.0f,0.0f},  // East
-   {0.0f,1.0f,0.0f},  // Up
-   {-1.0f,0.0f,0.0f}, // West
-   {0.0f,-1.0f,0.0f}, // Down
-   {0.0f,0.0f,1.0f},  // North
-   {0.0f,0.0f,-1.0f} // South
-};
-
-typedef enum CubeSides {
-   CubeSides_East,
-   CubeSides_Up,
-   CubeSides_West,
-   CubeSides_Down,
-   CubeSides_North,
-   CubeSides_South,
-} CubeSides;
-
-static struct osn_context *osn;
-
-typedef struct GPUVertex {
-   Vec4 position;
-   F32 uvx;
-   F32 uvy;
-} GPUVertex;
-
-typedef U32 GPUIndex;
-
-typedef struct Cube {
-   U16 material : 10; // 1024 material types
-   U16 light : 4;     // 0-15 light level
-   U16 flag1 : 1;     // 1-bit extra flag
-   U16 flag2 : 1;     // 1-bit extra flag
-} Cube;
-
-typedef enum Materials {
-   Material_Air,
-   Material_Bedrock,
-   Material_Dirt,
-   Material_Grass,      // Also note that bottoms of grass have dirt blocks.
-   Material_Grass_Side, // Sides of grass have a special texture.
-   Material_Wood_Trunk,
-   Material_Leaves
-} Material;
-
-// TODO: store a list of pointers of RenderChunk array (RenderChunk**)
-// into a Chunk datastructure. That way we can access the RenderChunk
-// and update it accordingly when we break a block. We can calculate
-// based on the position of the block breaking what position the RenderChunk
-// is in.
-
-typedef struct RenderChunk {
-   GPUVertex *vertexData; /// stretchy buffer
-   GPUIndex *indices;          /// stretchy buffer
-   GPUIndex currentIndex;      /// Current index offset
-   GPUIndex indiceCount;       /// Indice Size
-   S32 vertexCount;       /// VertexData Count 
-
-   GLuint vbo;            /// OpenGL Vertex Buffer Object
-   GLuint ibo;            /// OpenGL Index Buffer Object
-} RenderChunk;
-
-typedef struct Chunk {
-   S32 startX;
-   S32 startZ;
-   Cube *cubeData;                         /// Cube data for full chunk
-   RenderChunk renderChunks[CHUNK_SPLITS]; /// Per-render chunk data.
-} Chunk;
+#include "world/material.h"
+#include "world/util.h"
+#include "world/terrainGen.h"
 
 /// ChunkWorld is a flat 2D array that represents the entire
 /// world based upon
@@ -131,30 +39,16 @@ Chunk *gChunkWorld = NULL;
 // Grid size but should be variable. This is the 'chunk distance'.
 S32 worldSize = 2;
 
-Chunk* getChunkAt(S32 x, S32 z) {
-   // Since x and z can go from -worldSize to worldSize,
-   // we need to normalize them so that they are always positive.
-   x += worldSize;
-   z += worldSize;
-
-   S32 index = (z * (worldSize * 2)) + x;
-   return &gChunkWorld[index];
-}
-
 GLuint projMatrixLoc;
 GLuint modelMatrixLoc;
 GLuint textureLoc;
 U32 program;
 Texture2D textureAtlas;
 
-Cube* getCubeAt(Cube *cubeData, S32 x, S32 y, S32 z) {
-   return &cubeData[x * (MAX_CHUNK_HEIGHT) * (CHUNK_WIDTH) + z * (MAX_CHUNK_HEIGHT) + y];
-}
-
 #define TEXTURE_ATLAS_COUNT_I 32
 #define TEXTURE_ATLAS_COUNT_F 32.0f
 
-void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, Vec3 localPos) {
+static void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, Vec3 localPos) {
    // Vertex data first, then index data.
 
    RenderChunk *renderChunk = &chunk->renderChunks[index];
@@ -180,240 +74,6 @@ void buildFace(Chunk *chunk, S32 index, S32 side, S32 material, Vec3 localPos) {
    sb_push(renderChunk->indices, in + 2);
    renderChunk->currentIndex += 4;
    renderChunk->indiceCount += 6;
-}
-
-F32 getViewDistance() {
-   // Give 1 chunk 'padding' looking forward.
-   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
-}
-
-static inline bool isTransparent(Cube *cubeData, S32 x, S32 y, S32 z) {
-   assert(cubeData);
-   assert(getCubeAt(cubeData, x, y, z));
-   return getCubeAt(cubeData, x, y, z)->material == Material_Air;
-}
-
-static inline bool isTransparentAtCube(Cube *c) {
-   if (c == NULL)
-      return false;
-   return c->material == Material_Air;
-}
-
-static inline Chunk* getChunkAtWorldSpacePosition(S32 x, S32 y, S32 z) {
-   // first calculate chunk based upon position.
-   S32 chunkX = x < 0 ? ((x + 1) / CHUNK_WIDTH) - 1 : x / CHUNK_WIDTH;
-   S32 chunkZ = z < 0 ? ((z + 1) / CHUNK_WIDTH) - 1 : z / CHUNK_WIDTH;
-
-   // Don't go past.
-   if (chunkX < -worldSize || chunkX >= worldSize || chunkZ < -worldSize || chunkZ >= worldSize)
-      return NULL;
-
-   Chunk *chunk = getChunkAt(chunkX, chunkZ);
-   return chunk;
-}
-
-static inline RenderChunk* getRenderChunkAtWorldSpacePosition(S32 x, S32 y, S32 z, S32 *renderChunkIndex) {
-   Chunk *chunk = getChunkAtWorldSpacePosition(x, y, z);
-   if (chunk == NULL)
-      return NULL;
-   assert(y >= 0); // Ensure y is >= 0
-   assert(y < MAX_CHUNK_HEIGHT); // Ensure chunk is < MAX_CHUNK_HEIGHT
-
-   *renderChunkIndex = y / RENDER_CHUNK_HEIGHT;
-   return &chunk->renderChunks[*renderChunkIndex];
-}
-
-static inline void globalPosToLocalPos(S32 x, S32 y, S32 z, S32 *localX, S32 *localY, S32 *localZ) {
-   // first calculate chunk based upon position.
-   S32 chunkX = x < 0 ? ((x + 1) / CHUNK_WIDTH) - 1 : x / CHUNK_WIDTH;
-   S32 chunkZ = z < 0 ? ((z + 1) / CHUNK_WIDTH) - 1 : z / CHUNK_WIDTH;
-   S32 chunkY = y / RENDER_CHUNK_HEIGHT;
-
-   *localX = x - (chunkX * CHUNK_WIDTH);
-   *localZ = z - (chunkZ * CHUNK_WIDTH);
-   *localY = y - (chunkY * RENDER_CHUNK_HEIGHT);
-
-   assert(*localX >= 0);
-   assert(*localZ >= 0);
-   assert(*localY >= 0);
-   assert(*localX < CHUNK_WIDTH);
-   assert(*localZ < CHUNK_WIDTH);
-   assert(*localY < RENDER_CHUNK_HEIGHT);
-}
-
-static inline Cube* getGlobalCubeAtWorldSpacePosition(S32 x, S32 y, S32 z) {
-   // first calculate chunk based upon position.
-   S32 chunkX = x < 0 ? ((x + 1) / CHUNK_WIDTH) - 1 : x / CHUNK_WIDTH;
-   S32 chunkZ = z < 0 ? ((z + 1) / CHUNK_WIDTH) - 1 : z / CHUNK_WIDTH;
-
-   // Don't go past.
-   if (chunkX < -worldSize || chunkX >= worldSize || chunkZ < -worldSize || chunkZ >= worldSize)
-      return NULL;
-
-   Chunk *chunk = getChunkAt(chunkX, chunkZ);
-
-   S32 localChunkX = x - (chunkX * CHUNK_WIDTH);
-   S32 localChunkZ = z - (chunkZ * CHUNK_WIDTH);
-
-   assert(localChunkX >= 0);
-   assert(localChunkZ >= 0);
-   assert(localChunkX < CHUNK_WIDTH);
-   assert(localChunkZ < CHUNK_WIDTH);
-
-   return getCubeAt(chunk->cubeData, localChunkX, y, localChunkZ);
-}
-
-// Worldspace
-static bool shouldCave(S32 x, S32 y, S32 z) {
-   F64 cave_stretch = 24.0;
-
-   F64 noise = 0.0;
-   for (S32 i = 0; i < 6; ++i) {
-      F64 factor = cave_stretch * ((F64)((1 << i) / 3) + 1.0);
-
-      noise += (open_simplex_noise3(
-         osn,
-         (F64)(x) / factor * (F64)(1 << i),
-         (F64)y / factor * (F64)(1 << (i + 1)),
-         (F64)(z) / factor * (F64)(1 << i)
-      ) + 1.0) / (F64)(1 << (i + 1));
-   }
-
-   return noise >= 1.33;
-}
-
-static S32 solidCubesAroundCubeAt(S32 x, S32 y, S32 z, S32 worldX, S32 worldZ) {
-   S32 solidCount = 0;
-   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX - 1, y, z + worldZ)) && !shouldCave(x + worldX - 1, y, z + worldZ);
-   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX + 1, y, z + worldZ)) && !shouldCave(x + worldX + 1, y, z + worldZ);
-   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y - 1, z + worldZ)) && !shouldCave(x + worldX, y - 1, z + worldZ);
-   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y + 1, z + worldZ)) && !shouldCave(x + worldX, y + 1, z + worldZ);
-   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y, z - 1 + worldZ)) && !shouldCave(x + worldX, y, z - 1 + worldZ);
-   solidCount += !isTransparentAtCube(getGlobalCubeAtWorldSpacePosition(x + worldX, y, z + 1 + worldZ)) && !shouldCave(x + worldX, y, z + 1 + worldZ);
-   return solidCount;
-}
-
-void generateWorld(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
-   // We modulate divide CHUNK_WIDTH as we keep the grid static
-   // no matter where we move around on the map.
-   // Say we go west, well, the first 'west' chunks are replaced by new chunks.
-   // TODO: This doesn't work quite yet, and we might need to use chunk
-   // pointers so we can easilly rearrange the world.
-   // Or maybe a memcpy will be fine, who knows.
-
-   Chunk *chunk = getChunkAt(chunkX, chunkZ);
-   chunk->cubeData = (Cube*)calloc(CHUNK_SIZE, sizeof(Cube));
-   Cube *cubeData = chunk->cubeData;
-
-   F64 stretchFactor = 20.0;
-
-   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
-      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
-         // calculate height for each cube.
-         // Taking absolute value will allow for only 0-1 scaling.
-         // also make sure to use the world coordinates
-
-         // Smoothen the noise based on 5 blocks surrounding it.
-         F64 noise = (open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor)) * 10.0;
-         for (S32 i = -5; i < 5; ++i) {
-            for (S32 j = -5; j < 5; ++j) {
-               noise += (open_simplex_noise2(osn, (F64)(x + i + worldX) / (stretchFactor + i), (F64)(z + j + worldZ) / (stretchFactor + j)) * (10.0 + j)) / 2.0f;
-            }
-            noise /= 10.f;
-         }
-         //F64 noise = fabs(open_simplex_noise2(osn, (F64)(x + worldX) / stretchFactor, (F64)(z + worldZ) / stretchFactor) * 10.0);
-         S32 height = (S32)(noise) + 70.0f; // 70 as base height.
-
-         // Make block at height level grass.
-         getCubeAt(cubeData, x, height, z)->material = Material_Grass;
-
-         // Need to make air for anything above height.
-         // Anything below height is just block the whole way till last couple rows which
-         // are bedrock.
-         for (S32 y = height + 1; y < MAX_CHUNK_HEIGHT; ++y) {
-            // All air
-            getCubeAt(cubeData, x, y, z)->material = Material_Air;
-         }
-         for (S32 y = 4; y < height; ++y) {
-            // All dirt.
-            // todo: this is where we do stuff like caves!
-            // but of course in a second pass, or third pass...!
-            getCubeAt(cubeData, x, y, z)->material = Material_Dirt;
-         }
-         for (S32 y = 0; y < 4; ++y) {
-            // All bedrock
-            getCubeAt(cubeData, x, y, z)->material = Material_Bedrock;
-         }
-      }
-   }
-}
-
-void generateCavesAndStructures(S32 chunkX, S32 chunkZ, S32 worldX, S32 worldZ) {
-
-   Chunk *chunk = getChunkAt(chunkX, chunkZ);
-   Cube *cubeData = chunk->cubeData;
-
-   // Generate caves.
-   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
-      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
-         for (S32 y = 0; y < MAX_CHUNK_HEIGHT; ++y) {
-            Cube *c = getCubeAt(cubeData, x, y, z);
-            if (c->material == Material_Bedrock)
-               continue;
-            if (c->material == Material_Air)
-               break;
-
-            if (shouldCave(x + worldX, y, z + worldZ)) {
-               // Perform smothing.
-               S32 solidCount = solidCubesAroundCubeAt(x, y, z, worldX, worldZ);
-               if (solidCount < 4) {
-                  // It's a cave, carve out air.
-                  c->material = Material_Air;
-               }
-            }
-         }
-      }
-   }
-
-   // Generate Trees
-   for (S32 x = 0; x < CHUNK_WIDTH; ++x) {
-      for (S32 z = 0; z < CHUNK_WIDTH; ++z) {
-         // Find the height. Skip over anything that isn't the height.
-         // and we only care about grass.
-         S32 height = MAX_CHUNK_HEIGHT - 1;
-         for (; height >= 0; --height) {
-            if (getCubeAt(cubeData, x, height, z)->material != Material_Air) {
-               break;
-            }
-         }
-
-         if (getCubeAt(cubeData, x, height, z)->material == Material_Grass) {
-            // Lets generate some trees.
-            //
-            // Also, a tree only has a 1/10 chance of spawning on this block.
-            S32 posX = x;
-            S32 posZ = z;
-            if (open_simplex_noise2(osn, (F64)posX + worldX, (F64)posZ + worldZ) >= 0.8) {
-               getCubeAt(cubeData, x, height + 1, z)->material = Material_Wood_Trunk;
-               getCubeAt(cubeData, x, height + 2, z)->material = Material_Wood_Trunk;
-               getCubeAt(cubeData, x, height + 3, z)->material = Material_Wood_Trunk;
-               for (S32 xxx = x - 3; xxx < x + 3; ++xxx) {
-                  if (xxx >= CHUNK_WIDTH)
-                     break;
-                  else if (xxx < 0)
-                     continue;
-                  for (S32 zzz = z - 3; zzz < z + 3; ++zzz) {
-                     if (zzz >= CHUNK_WIDTH)
-                        break;
-                     else if (zzz < 0)
-                        continue;
-                     getCubeAt(cubeData, xxx, height + 4, zzz)->material = Material_Leaves;
-                  }
-               }
-            }
-         }
-      }
-   }
 }
 
 void generateGeometryForRenderChunk(Chunk *chunk, S32 renderChunkId) {
@@ -507,6 +167,11 @@ void generateGeometryForRenderChunk(Chunk *chunk, S32 renderChunkId) {
          }
       }
    }
+}
+
+F32 getViewDistance() {
+   // Give 1 chunk 'padding' looking forward.
+   return worldSize * CHUNK_WIDTH + CHUNK_WIDTH;
 }
 
 void generateGeometry(Chunk *chunk) {
@@ -628,7 +293,7 @@ void initWorld() {
    pickerShaderProjMatrixLoc = glGetUniformLocation(pickerProgram, "projViewMatrix");
    pickerShaderModelMatrixLoc = glGetUniformLocation(pickerProgram, "modelMatrix");
 
-   open_simplex_noise((U64)0xDEADBEEF, &osn);
+   initTerrainGen();
 
    // world grid
    gChunkWorld = (Chunk*)calloc((worldSize * 2) * (worldSize * 2), sizeof(Chunk));
@@ -681,7 +346,7 @@ void freeWorld() {
    }
 
    free(gChunkWorld);
-   open_simplex_noise_free(osn);
+   freeTerrainGen();
 }
 
 void freeGenerateUpdate(Chunk *c, RenderChunk *r, S32 renderChunkId) {
@@ -753,38 +418,6 @@ void removeCubeAtWorldPosition(Cube *cube, S32 x, S32 y, S32 z) {
 
    cube->material = Material_Air;
    remeshChunkGeometryAtGlobalPos(x, y, z);
-}
-
-static inline bool isFloatZero(F32 flt) {
-   return flt > -0.0001f && flt < 0.0001f;
-}
-
-bool rayIntersectsPlane(Vec3 rayOrigin, Vec3 rayDir, Vec4 plane, Vec3 *outPos) {
-   // t = -(ray_origin dot plane_normal + distance_from_plane) / (ray_dir dot normal)
-   // point_of_intersection = ray_origin + (t * ray_dir)
-
-   Vec3 normal = create_vec3(plane.x, plane.y, plane.z);
-   F32 rayNormal = glm_vec_dot(rayDir.vec, normal.vec);
-
-   // No divide by 0
-   if (isFloatZero(rayNormal))
-      return false;
-
-   Vec3 center;
-   glm_vec_scale(normal.vec, plane.w, center.vec);
-
-   Vec3 diff;
-   glm_vec_sub(center.vec, rayOrigin.vec, diff.vec);
-
-   F32 t = /*-*/(glm_vec_dot(diff.vec, normal.vec)/* + plane.w*/) / rayNormal;
-   if (isFloatZero(t))
-      return false;
-
-   // Get point of intersection
-   Vec3 scale;
-   glm_vec_scale(rayDir.vec, t, scale.vec);
-   glm_vec_add(rayOrigin.vec, scale.vec, outPos->vec);
-   return true;
 }
 
 void addCubeAtGlobalPos(Vec3 position) {
